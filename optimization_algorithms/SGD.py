@@ -1,7 +1,7 @@
 import numpy as np
-from typing import Callable
 
 from optimization_algorithms import BaseOptimizer
+from objective_functions import BaseObjectiveFunction
 
 
 class SGD(BaseOptimizer):
@@ -27,13 +27,12 @@ class SGD(BaseOptimizer):
         X: np.ndarray,
         Y: np.ndarray,
         theta: np.ndarray,
-        g_grad: Callable,
-        g_grad_and_hessian: Callable,
+        g: BaseObjectiveFunction,
     ):
         """
         Perform one optimization step
         """
         self.iteration += 1
-        grad = g_grad(X, Y, theta)
+        grad = g.grad(X, Y, theta)
         learning_rate = self.c_mu * self.iteration ** (-self.mu)
         theta += -learning_rate * grad

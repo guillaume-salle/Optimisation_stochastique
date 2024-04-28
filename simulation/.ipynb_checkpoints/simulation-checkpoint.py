@@ -1,10 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Callable
-from tqdm.auto import tqdm
+
+from tqdm.autonotebook import tqdm
+
+# from tqdm import tqdm
 
 from optimization_algorithms import BaseOptimizer
-from objective_functions import BaseObjectiveFunction
 
 
 class Simulation:
@@ -15,7 +17,9 @@ class Simulation:
 
     def __init__(
         self,
-        g: BaseObjectiveFunction,
+        g: Callable,
+        g_grad: Callable,
+        g_grad_and_hessian: Callable,
         optimizer_list: List[BaseOptimizer],
         e: float,
         dataset: List[Tuple[np.ndarray, np.ndarray]] = None,
@@ -35,6 +39,8 @@ class Simulation:
         self.true_theta = true_theta
         self.true_hessian_inv = true_hessian_inv
         self.g = g
+        self.g_grad = g_grad
+        self.g_grad_and_hessian = g_grad_and_hessian
         self.optimizer_list = optimizer_list
         self.dataset = dataset
         self.generate_dataset = generate_dataseet
@@ -64,9 +70,7 @@ class Simulation:
                 np.linalg.norm(optimizer.hessian_inv - self.true_hessian_inv, ord="fro")
             )
 
-    def run(
-        self, pbars: Tuple[tqdm, tqdm] = None, plot: bool = False
-    ) -> Tuple[List[float], List[float]]:
+    def run(self, plot: bool = False) -> Tuple[List[float], List[float]]:
         """
         Run the experiment for a given initial theta, a dataset and a list of optimizers
         """
@@ -87,31 +91,19 @@ class Simulation:
             else None
         )
 
-        if pbars is not None:
-            optimizer_pbar, data_pbar = pbars
-            optimizer_pbar.reset(total=len(self.optimizer_list))
-            data_pbar.reset(total=len(self.dataset))
-        else:
-            optimizer_pbar = tqdm(
-                total=len(self.optimizer_list), desc="Optimizers", position=0
-            )
-            data_pbar = tqdm(total=len(self.dataset), desc="Data", position=1)
-
         # Run the experiment for each optimizer
-        for optimizer in self.optimizer_list:
-            optimizer_pbar.set_description(optimizer.name)
+        for optimizer in tqdm(
+            self.optimizer_list, desc="Optimizers", leave=False, position=1
+        ):
             self.theta = self.initial_theta.copy()
             optimizer.reset(self.theta_dim)
             # Log initial error
             self.log_estimation_error(theta_errors, hessian_inv_errors, optimizer)
 
             # Online pass on the dataset
-            for X, Y in self.dataset:
-                optimizer.step(X, Y, self.theta, self.g)
+            for X, Y in tqdm(self.dataset, desc="Data", leave=False, position=2):
+                optimizer.step(X, Y, self.theta, self.g_grad, self.g_grad_and_hessian)
                 self.log_estimation_error(theta_errors, hessian_inv_errors, optimizer)
-                data_pbar.update(1)
-            optimizer_pbar.update(1)
-
             # Convert errors to numpy arrays
             if theta_errors is not None:
                 theta_errors[optimizer.name] = np.array(theta_errors[optimizer.name])
@@ -119,11 +111,6 @@ class Simulation:
                 hessian_inv_errors[optimizer.name] = np.array(
                     hessian_inv_errors[optimizer.name]
                 )
-
-        if pbars is None:
-            optimizer_pbar.close()
-            data_pbar.close()
-
         if plot:
             self.plot_errors(theta_errors, hessian_inv_errors)
 
@@ -148,39 +135,22 @@ class Simulation:
             else None
         )
 
-        # tqdm with VScode bugs, have to initialize the bars outside and reset in the loop
-        runs_pbar = tqdm(range(num_runs), desc="Runs", position=0, leave=True)
-        optimizer_pbar = tqdm(
-            total=len(self.optimizer_list), desc="Optimizers", position=1, leave=True
-        )
-        data_pbar = tqdm(total=n, desc="Data", position=2, leave=True)
-
-        # Run the experiment multiple times
-        for _ in runs_pbar:
+        for i in tqdm(range(num_runs), desc="Runs", position=0):
             self.dataset = self.generate_dataset(n, self.true_theta)
             self.generate_initial_theta()
-            theta_errors, hessian_inv_errors = self.run([optimizer_pbar, data_pbar])
-
-            # Aggregate the errors
+            theta_errors, hessian_inv_errors = self.run()
             if self.true_theta is not None:
                 for name, errors in theta_errors.items():
                     self.theta_errors_avg[name] += errors
             if self.true_hessian_inv is not None:
                 for name, errors in hessian_inv_errors.items():
                     self.hessian_inv_errors_avg[name] += errors
-
-        # Average the errors
         if self.true_theta is not None:
             for name, errors in self.theta_errors_avg.items():
                 errors /= num_runs
         if self.true_hessian_inv is not None:
             for name, errors in self.hessian_inv_errors_avg.items():
                 errors /= num_runs
-
-        data_pbar.close()
-        optimizer_pbar.close()
-        runs_pbar.close()
-
         self.plot_errors(self.theta_errors_avg, self.hessian_inv_errors_avg)
 
     def plot_errors(self, theta_errors: dict, hessian_inv_errors: dict):

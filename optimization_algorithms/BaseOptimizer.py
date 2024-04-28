@@ -2,6 +2,8 @@ import numpy as np
 from typing import Callable
 from abc import ABC, abstractmethod
 
+from objective_functions import BaseObjectiveFunction
+
 
 class BaseOptimizer(ABC):
     """
@@ -23,8 +25,7 @@ class BaseOptimizer(ABC):
         self,
         X: np.ndarray,
         Y: np.ndarray,
-        g_grad: Callable,
-        g_grad_and_hessian: Callable,
+        g: BaseObjectiveFunction,
     ) -> None:
         """
         Perform one optimization step.

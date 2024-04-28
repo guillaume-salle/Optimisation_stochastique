@@ -2,6 +2,7 @@ import numpy as np
 from typing import Callable
 
 from optimization_algorithms import BaseOptimizer
+from objective_functions import BaseObjectiveFunction
 
 
 class SNA(BaseOptimizer):
@@ -24,18 +25,13 @@ class SNA(BaseOptimizer):
         self.hessian_inv = np.eye(theta_dim)
 
     def step(
-        self,
-        X: np.ndarray,
-        Y: np.ndarray,
-        theta: np.ndarray,
-        g_grad: Callable,
-        g_grad_and_hessian: Callable,
+        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, g: BaseObjectiveFunction
     ):
         """
         Perform one optimization step
         """
         self.iteration += 1
-        grad, hessian = g_grad_and_hessian(X, Y, theta)
+        grad, hessian = g.grad_and_hessian(X, Y, theta)
         self.hessian += (hessian - self.hessian) / (self.iteration + 1)
         try:
             self.hessian_inv = np.linalg.inv(self.hessian)
