@@ -4,7 +4,7 @@ from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
 
 
-class SNA(BaseOptimizer):
+class WASNA(BaseOptimizer):
     """
     Stochastic Newton Algorithm optimizer
     """
@@ -49,7 +49,6 @@ class SNA(BaseOptimizer):
                 self.hessian_bar / (self.iter + self._lambda)
             )
         except np.linalg.LinAlgError:
-            # Hessian is not invertible
-            self.hessian_inv = np.eye(theta_estimate.shape[0])
+            print("Hessian is not invertible")
         learning_rate = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
         theta_estimate += -learning_rate * self.hessian_inv @ grad

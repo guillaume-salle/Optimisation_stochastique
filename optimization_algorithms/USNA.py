@@ -33,7 +33,7 @@ class USNA(BaseOptimizer):
         else:
             raise ValueError("Invalid value for Z. Choose 'normal' or 'canonic'.")
 
-    def reset(self, theta_dim: int):
+    def reset(self, initial_theta: np.ndarray):
         """
         Reset the learning rate and estimate of the hessian
         """

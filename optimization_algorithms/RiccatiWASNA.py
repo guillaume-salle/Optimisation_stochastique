@@ -4,7 +4,7 @@ from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
 
 
-class SNA(BaseOptimizer):
+class RiccatiWASNA(BaseOptimizer):
     """
     Stochastic Newton Algorithm optimizer
     """
@@ -14,7 +14,7 @@ class SNA(BaseOptimizer):
         mu: float,
         c_mu: float = 1.0,
         add_iter_lr: int = 20,
-        _lambda: float = 1.0,  # Weight more the initial identity matrix
+        _lambda: float = 100.0,  # Weight more the initial identity matrix
     ):
         self.name = f"SNA mu={mu}"
         self.mu = mu
@@ -28,7 +28,6 @@ class SNA(BaseOptimizer):
         """
         self.iter = 0
         theta_dim = initial_theta.shape[0]
-        self.hessian_bar = self._lambda * np.eye(theta_dim)
         self.hessian_inv = np.eye(theta_dim)
 
     def step(
@@ -42,14 +41,8 @@ class SNA(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, hessian = g.grad_and_hessian(X, Y, theta_estimate)
-        self.hessian_bar += hessian
-        try:
-            self.hessian_inv = np.linalg.inv(
-                self.hessian_bar / (self.iter + self._lambda)
-            )
-        except np.linalg.LinAlgError:
-            # Hessian is not invertible
-            self.hessian_inv = np.eye(theta_estimate.shape[0])
+        grad, phi = g.grad_and_hessian(X, Y, theta_estimate)
+        product = self.hessian_inv @ phi
+        self.hessian_inv += -np.outer(product, product) / (1 + np.dot(phi, product))
         learning_rate = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
         theta_estimate += -learning_rate * self.hessian_inv @ grad

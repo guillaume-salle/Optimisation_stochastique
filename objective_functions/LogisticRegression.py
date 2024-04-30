@@ -69,3 +69,17 @@ class LogisticRegression(BaseObjectiveFunction):
         grad = (p - Y) * phi
         hessian = p * (1 - p) * np.outer(phi, phi)
         return grad, hessian
+
+    def grad_and_riccati(
+        self, X: np.ndarray, Y: np.ndarray, h: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the gradient and the Ricatti of the logistic loss
+        Does not work for a batch of data because of the outer product
+        """
+        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
+        dot_product = np.dot(phi, h)
+        p = sigmoid(dot_product)
+        grad = (p - Y) * phi
+        ricatti = np.sqrt(p * (1 - p)) * phi
+        return grad, ricatti

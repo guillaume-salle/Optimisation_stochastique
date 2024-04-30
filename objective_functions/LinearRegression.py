@@ -50,3 +50,16 @@ class LinearRegression(BaseObjectiveFunction):
         grad = error * phi
         hessian = np.outer(phi, phi)
         return grad, hessian
+
+    def grad_and_riccati(
+        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the gradient and the Riccati of the linear regression loss, works only for a single data point
+        """
+        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
+        Y_pred = np.dot(phi, theta)
+        error = Y_pred - Y
+        grad = error * phi
+        riccati = phi
+        return grad, riccati

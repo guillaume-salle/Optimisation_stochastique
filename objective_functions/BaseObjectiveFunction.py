@@ -25,3 +25,10 @@ class BaseObjectiveFunction(ABC):
         self, X: np.ndarray, Y: np.ndarray, h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
+
+    def grad_and_riccati(
+        self, X: np.ndarray, Y: np.ndarray, h: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        raise NotImplementedError(
+            "Riccati is not implemented for this objective function"
+        )

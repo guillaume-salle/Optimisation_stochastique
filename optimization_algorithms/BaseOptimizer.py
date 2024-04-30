@@ -25,6 +25,7 @@ class BaseOptimizer(ABC):
         self,
         X: np.ndarray,
         Y: np.ndarray,
+        thea_estimate: np.ndarray,
         g: BaseObjectiveFunction,
     ) -> None:
         """

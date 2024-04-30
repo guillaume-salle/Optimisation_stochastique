@@ -28,8 +28,6 @@ class Simulation:
         """
         if dataset is None and generate_dataset is None:
             raise ValueError("dataset or create_dataset should be set")
-        if true_theta is None and theta_dim is None:
-            raise ValueError("dim_theta is not set")
 
         self.true_theta = true_theta
         self.true_hessian_inv = true_hessian_inv
@@ -103,7 +101,7 @@ class Simulation:
 
         # Run the experiment for each optimizer
         for optimizer in self.optimizer_list:
-            optimizer.reset(self.initial_theta.shape[0])
+            optimizer.reset(self.initial_theta)
             optimizer_pbar.set_description(optimizer.name)
             self.theta = self.initial_theta.copy()
 
