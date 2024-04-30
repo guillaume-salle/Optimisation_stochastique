@@ -14,13 +14,13 @@ class WASNA(BaseOptimizer):
         mu: float,
         c_mu: float = 1.0,
         add_iter_lr: int = 20,
-        _lambda: float = 1.0,  # Weight more the initial identity matrix
+        lambda_: float = 1.0,  # Weight more the initial identity matrix
     ):
         self.name = f"SNA mu={mu}"
         self.mu = mu
         self.c_mu = c_mu
         self.add_iter_lr = add_iter_lr
-        self._lambda = _lambda
+        self.lambda_ = lambda_
 
     def reset(self, initial_theta: np.ndarray):
         """
@@ -28,7 +28,7 @@ class WASNA(BaseOptimizer):
         """
         self.iter = 0
         theta_dim = initial_theta.shape[0]
-        self.hessian_bar = self._lambda * np.eye(theta_dim)
+        self.hessian_bar = self.lambda_ * np.eye(theta_dim)
         self.hessian_inv = np.eye(theta_dim)
 
     def step(
@@ -46,7 +46,7 @@ class WASNA(BaseOptimizer):
         self.hessian_bar += hessian
         try:
             self.hessian_inv = np.linalg.inv(
-                self.hessian_bar / (self.iter + self._lambda)
+                self.hessian_bar / (self.iter + self.lambda_)
             )
         except np.linalg.LinAlgError:
             print("Hessian is not invertible")

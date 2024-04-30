@@ -14,22 +14,21 @@ class SNA(BaseOptimizer):
         mu: float,
         c_mu: float = 1.0,
         add_iter_lr: int = 20,
-        _lambda: float = 1.0,  # Weight more the initial identity matrix
+        lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
     ):
         self.name = f"SNA mu={mu}"
         self.mu = mu
         self.c_mu = c_mu
         self.add_iter_lr = add_iter_lr
-        self._lambda = _lambda
+        self.lambda_ = lambda_
 
     def reset(self, initial_theta: np.ndarray):
         """
         Reset the learning rate and estimate of the hessian
         """
         self.iter = 0
-        theta_dim = initial_theta.shape[0]
-        self.hessian_bar = self._lambda * np.eye(theta_dim)
-        self.hessian_inv = np.eye(theta_dim)
+        self.theta_dim = initial_theta.shape[0]
+        self.hessian_bar = self.lambda_ * self.theta_dim * np.eye(self.theta_dim)
 
     def step(
         self,
@@ -45,11 +44,11 @@ class SNA(BaseOptimizer):
         grad, hessian = g.grad_and_hessian(X, Y, theta_estimate)
         self.hessian_bar += hessian
         try:
-            self.hessian_inv = np.linalg.inv(
-                self.hessian_bar / (self.iter + self._lambda)
+            hessian_inv = np.linalg.inv(
+                self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
             )
         except np.linalg.LinAlgError:
             # Hessian is not invertible
-            self.hessian_inv = np.eye(theta_estimate.shape[0])
+            hessian_inv = np.eye(theta_estimate.shape[0])
         learning_rate = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
-        theta_estimate += -learning_rate * self.hessian_inv @ grad
+        theta_estimate += -learning_rate * hessian_inv @ grad

@@ -184,14 +184,18 @@ class Simulation:
 
         self.plot_all_errors(self.theta_errors_avg, self.hessian_inv_errors_avg)
 
-    def plot_errors(self, errors: dict, title: str):
+    def plot_errors(self, errors: dict, title: str, ylabel: str):
         plt.figure(figsize=(10, 6))
+        min_error = float("inf")
         for name, errors in errors.items():
             plt.plot(errors, label=name)
+            min_error = min(min_error, np.min(errors))
         plt.xscale("log")
         plt.yscale("log")
+        plt.ylim(bottom=min(min_error, 1e-3))
         plt.xlabel("Sample size")
-        plt.ylabel("Mean Squared error")
+        average = "average" if len(errors) > 1 else ""
+        plt.ylabel(average + ylabel)
         plt.title(title)
         plt.suptitle(self.g.name)
         plt.legend()
@@ -202,8 +206,12 @@ class Simulation:
         Plot the errors of estimated theta and hessian inverse of all optimizers
         """
         if self.true_theta is not None:
-            self.plot_errors(theta_errors, f"e = {self.e}")
+            self.plot_errors(
+                theta_errors, f"e = {self.e}", r"$\| \theta - \theta^* \|^2$"
+            )
         if self.true_hessian_inv is not None:
-            self.plot_errors(hessian_inv_errors, f"e = {self.e}")
+            self.plot_errors(
+                hessian_inv_errors, f"e = {self.e}", r"$\| H^{-1} - H^{-1*} \|_F$"
+            )
 
     plt.show()
