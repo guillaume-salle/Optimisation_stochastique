@@ -10,17 +10,17 @@ class SGD(BaseOptimizer):
     Uses a learning rate lr = c_mu * iteration^(-mu)
     """
 
-    def __init__(self, mu: float, c_mu: float):
-        self.name = "SGD"
+    def __init__(self, mu: float, c_mu: float = 1.0, initial_iteration: int = 20):
+        self.name = f"SGD mu={mu}"
         self.mu = mu
         self.c_mu = c_mu
-        self.iteration = 0
+        self.initial_iteration = initial_iteration  # Dont start at 0 to avoid large learning rates at the beginning
 
     def reset(self, theta_dim: int):
         """
         Reset the optimizer state
         """
-        self.iteration = 0
+        self.iteration = self.initial_iteration
 
     def step(
         self,
@@ -34,5 +34,5 @@ class SGD(BaseOptimizer):
         """
         self.iteration += 1
         grad = g.grad(X, Y, theta)
-        learning_rate = self.c_mu * self.iteration ** (-self.mu)
+        learning_rate = self.c_mu * (self.iteration ** (-self.mu))
         theta += -learning_rate * grad

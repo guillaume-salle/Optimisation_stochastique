@@ -12,21 +12,34 @@ def sigmoid(x: np.ndarray):
 
 
 class LogisticRegression(BaseObjectiveFunction):
+    """
+    Logistic Regression class
+    """
+
+    def __init__(self, bias: bool = True):
+        self.name = "Logistic model"
+        self.bias = bias
+
     def __call__(self, X: np.ndarray, Y: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
         Compute the logistic loss, works with a batch or a single data point
         """
         X = np.atleast_2d(X)
-        n = X.shape[0]
-        phi = np.hstack([np.ones(n, 1), X])
+        phi = np.hstack([np.ones((X.shape[0], 1)), X]) if self.bias else X
         dot_product = np.dot(phi, h)
         return np.log(1 + np.exp(dot_product)) - dot_product * Y
+
+    def get_theta_dim(self, X: np.ndarray) -> int:
+        """
+        Return the dimension of theta
+        """
+        return X.shape[-1] + 1 if self.bias else X.shape[-1]
 
     def grad(self, X: np.ndarray, Y: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
         Compute the gradient of the logistic loss, works only for a single data point
         """
-        phi = np.hstack([np.ones((1,)), X])
+        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
         dot_product = np.dot(phi, h)
         p = sigmoid(dot_product)
         # grad = (p - Y)[:, np.newaxis] * phi
@@ -42,7 +55,7 @@ class LogisticRegression(BaseObjectiveFunction):
         """
         # For batch data, should work
         # n, d = X.shape
-        # phi = np.hstack([np.ones(n, 1), X])
+        # phi = np.hstack([np.ones(n, 1), X]) if self.bias else X
         # dot_product = np.dot(phi, h)
         # p = sigmoid(dot_product)
         # grad = (p - Y) * phi
@@ -50,7 +63,7 @@ class LogisticRegression(BaseObjectiveFunction):
         # return grad, hessian
 
         # For a single data point
-        phi = np.hstack([np.ones((1,)), X])
+        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
         dot_product = np.dot(phi, h)
         p = sigmoid(dot_product)
         grad = (p - Y) * phi

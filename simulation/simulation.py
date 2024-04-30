@@ -19,15 +19,14 @@ class Simulation:
         optimizer_list: List[BaseOptimizer],
         e: float,
         dataset: List[Tuple[np.ndarray, np.ndarray]] = None,
-        generate_dataseet: Callable = None,
+        generate_dataset: Callable = None,
         true_theta: np.ndarray = None,
         true_hessian_inv: np.ndarray = None,
-        theta_dim: int = None,
     ):
         """
         Initialize the experiment
         """
-        if dataset is None and generate_dataseet is None:
+        if dataset is None and generate_dataset is None:
             raise ValueError("dataset or create_dataset should be set")
         if true_theta is None and theta_dim is None:
             raise ValueError("dim_theta is not set")
@@ -37,22 +36,26 @@ class Simulation:
         self.g = g
         self.optimizer_list = optimizer_list
         self.dataset = dataset
-        self.generate_dataset = generate_dataseet
+        self.generate_dataset = generate_dataset
         self.e = e
         self.true_theta = true_theta
-        self.theta_dim = theta_dim if true_theta is None else true_theta.shape[0]
         self.true_hessian_inv = true_hessian_inv
 
     def generate_initial_theta(self):
         """
         Generate a random initial theta
         """
+        if self.dataset is None:
+            raise ValueError("dataset is not set")
+        theta_dim = self.g.get_theta_dim(self.dataset[0][0])
+        if self.true_theta is not None and self.true_theta.shape[0] != theta_dim:
+            raise ValueError(
+                f"true_theta dim ({self.true_theta.shape[0]}) does not match the dim of theta ({theta_dim}) for g"
+            )
         if self.e is None:
             raise ValueError("e is not set for generating random theta")
-        loc = (
-            self.true_theta if self.true_theta is not None else np.zeros(self.theta_dim)
-        )
-        self.initial_theta = loc + self.e * np.random.randn(self.theta_dim)
+        loc = self.true_theta if self.true_theta is not None else np.zeros(theta_dim)
+        self.initial_theta = loc + self.e * np.random.randn(theta_dim)
 
     def log_estimation_error(self, theta_errors, hessian_inv_errors, optimizer):
         if theta_errors is not None:
@@ -87,6 +90,7 @@ class Simulation:
             else None
         )
 
+        # Pbars are given from run_multiple (workaround vscode bug), otherwise initialize them
         if pbars is not None:
             optimizer_pbar, data_pbar = pbars
             optimizer_pbar.reset(total=len(self.optimizer_list))
@@ -99,13 +103,15 @@ class Simulation:
 
         # Run the experiment for each optimizer
         for optimizer in self.optimizer_list:
+            optimizer.reset(self.initial_theta.shape[0])
             optimizer_pbar.set_description(optimizer.name)
             self.theta = self.initial_theta.copy()
-            optimizer.reset(self.theta_dim)
+
             # Log initial error
             self.log_estimation_error(theta_errors, hessian_inv_errors, optimizer)
 
             # Online pass on the dataset
+            data_pbar.reset()
             for X, Y in self.dataset:
                 optimizer.step(X, Y, self.theta, self.g)
                 self.log_estimation_error(theta_errors, hessian_inv_errors, optimizer)
@@ -125,23 +131,21 @@ class Simulation:
             data_pbar.close()
 
         if plot:
-            self.plot_errors(theta_errors, hessian_inv_errors)
+            self.plot_all_errors(theta_errors, hessian_inv_errors)
 
         return theta_errors, hessian_inv_errors
 
-    def run_multiple(self, num_runs: int = 100, n: int = 10_000):
+    def run_multiple_datasets(self, num_runs: int = 100, n: int = 10_000):
         """
         Run the experiment multiple times by generating a new dataset and initial theta each time
         """
         if self.true_theta is None or self.generate_dataset is None:
             raise ValueError("true_theta and/or create_dataset are not set")
 
-        # length of error arrays is n + 1 for initial error
-        self.theta_errors_avg = (
-            {optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list}
-            if self.true_theta is not None
-            else None
-        )
+        # initialize error dicts, length of error arrays is n + 1 for initial error
+        self.theta_errors_avg = {
+            optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list
+        }
         self.hessian_inv_errors_avg = (
             {optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list}
             if self.true_hessian_inv is not None
@@ -158,21 +162,20 @@ class Simulation:
         # Run the experiment multiple times
         for _ in runs_pbar:
             self.dataset = self.generate_dataset(n, self.true_theta)
+            first_X, _ = self.dataset[0]
             self.generate_initial_theta()
             theta_errors, hessian_inv_errors = self.run([optimizer_pbar, data_pbar])
 
             # Aggregate the errors
-            if self.true_theta is not None:
-                for name, errors in theta_errors.items():
-                    self.theta_errors_avg[name] += errors
+            for name, errors in theta_errors.items():
+                self.theta_errors_avg[name] += errors
             if self.true_hessian_inv is not None:
                 for name, errors in hessian_inv_errors.items():
                     self.hessian_inv_errors_avg[name] += errors
 
         # Average the errors
-        if self.true_theta is not None:
-            for name, errors in self.theta_errors_avg.items():
-                errors /= num_runs
+        for name, errors in self.theta_errors_avg.items():
+            errors /= num_runs
         if self.true_hessian_inv is not None:
             for name, errors in self.hessian_inv_errors_avg.items():
                 errors /= num_runs
@@ -181,25 +184,28 @@ class Simulation:
         optimizer_pbar.close()
         runs_pbar.close()
 
-        self.plot_errors(self.theta_errors_avg, self.hessian_inv_errors_avg)
+        self.plot_all_errors(self.theta_errors_avg, self.hessian_inv_errors_avg)
 
-    def plot_errors(self, theta_errors: dict, hessian_inv_errors: dict):
+    def plot_errors(self, errors: dict, title: str):
+        plt.figure(figsize=(10, 6))
+        for name, errors in errors.items():
+            plt.plot(errors, label=name)
+        plt.xscale("log")
+        plt.yscale("log")
+        plt.xlabel("Sample size")
+        plt.ylabel("Mean Squared error")
+        plt.title(title)
+        plt.suptitle(self.g.name)
+        plt.legend()
+        plt.show()
+
+    def plot_all_errors(self, theta_errors: dict, hessian_inv_errors: dict):
         """
         Plot the errors of estimated theta and hessian inverse of all optimizers
         """
         if self.true_theta is not None:
-            for name, errors in theta_errors.items():
-                plt.plot(errors, label=name)
-            plt.xlabel("n")
-            plt.ylabel("theta estimation squared error")
-            plt.title(f"e = {self.e}")
-            plt.legend()
-            plt.show()
+            self.plot_errors(theta_errors, f"e = {self.e}")
         if self.true_hessian_inv is not None:
-            for name, errors in hessian_inv_errors.items():
-                plt.plot(errors, label=name)
-            plt.xlabel("n")
-            plt.ylabel("hessian inverse estimation error")
-            plt.title(f"e = {self.e}")
-            plt.legend()
-            plt.show()
+            self.plot_errors(hessian_inv_errors, f"e = {self.e}")
+
+    plt.show()

@@ -13,6 +13,10 @@ class BaseObjectiveFunction(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_theta_dim(self, X: np.ndarray) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
     def grad(self, X: np.ndarray, Y: np.ndarray, h: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 

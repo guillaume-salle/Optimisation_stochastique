@@ -1,5 +1,4 @@
 import numpy as np
-from typing import Callable
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -10,18 +9,19 @@ class SNA(BaseOptimizer):
     Stochastic Newton Algorithm optimizer
     """
 
-    def __init__(self, mu: float, c_mu: float):
-        self.name = "SNA"
+    def __init__(self, mu: float, c_mu: float = 1.0, initial_iteration: int = 20):
+        self.name = f"SNA mu={mu}"
         self.mu = mu
         self.c_mu = c_mu
-        self.iteration = 0
+        self.initial_iteration = initial_iteration
 
     def reset(self, theta_dim: int):
         """
         Reset the learning rate and estimate of the hessian
         """
-        self.iteration = 0
+        self.iteration = self.initial_iteration
         self.hessian = np.eye(theta_dim)
+        # Multiplier inverse de la hassienne par 100
         self.hessian_inv = np.eye(theta_dim)
 
     def step(
