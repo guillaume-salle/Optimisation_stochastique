@@ -29,24 +29,24 @@ class WASGD(BaseOptimizer):
         Reset the optimizer state
         """
         self.iter = 0
-        self.theta = np.copy(initial_theta)  # Theta not averaged
-        self.sum_avg = 0
+        self.theta_not_averaged = np.copy(initial_theta)
+        self.sum_avg_coeff = 0
 
     def step(
         self,
         X: np.ndarray,
         Y: np.ndarray,
-        theta_estimate: np.ndarray,  # This is the averaged theta, the not averaged is self.theta
+        theta: np.ndarray,
         g: BaseObjectiveFunction,
     ):
         """
         Perform one optimization step
         """
         self.iter += 1
-        grad = g.grad(X, Y, self.theta)
+        grad = g.grad(X, Y, self.theta_not_averaged)
         learning_rate = self.c_mu * ((self.iter + self.add_iter_lr) ** (-self.mu))
-        self.theta += -learning_rate * grad
+        self.theta_not_averaged += -learning_rate * grad
 
         avg_coeff = np.log(self.iter + 1) ** self.thau
-        self.sum_avg += avg_coeff
-        theta_estimate += (self.theta - theta_estimate) * avg_coeff / self.sum_avg
+        self.sum_avg_coeff += avg_coeff
+        theta += (self.theta_not_averaged - theta) * avg_coeff / self.sum_avg_coeff

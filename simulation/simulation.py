@@ -92,12 +92,13 @@ class Simulation:
         if pbars is not None:
             optimizer_pbar, data_pbar = pbars
             optimizer_pbar.reset(total=len(self.optimizer_list))
-            data_pbar.reset(total=len(self.dataset))
         else:
             optimizer_pbar = tqdm(
                 total=len(self.optimizer_list), desc="Optimizers", position=0
             )
-            data_pbar = tqdm(total=len(self.dataset), desc="Data", position=1)
+            data_pbar = tqdm(
+                total=len(self.dataset), desc="Data", position=1, leave=False
+            )
 
         # Run the experiment for each optimizer
         for optimizer in self.optimizer_list:
@@ -109,7 +110,7 @@ class Simulation:
             self.log_estimation_error(theta_errors, hessian_inv_errors, optimizer)
 
             # Online pass on the dataset
-            data_pbar.reset()
+            data_pbar.reset(total=len(self.dataset))
             for X, Y in self.dataset:
                 optimizer.step(X, Y, self.theta, self.g)
                 self.log_estimation_error(theta_errors, hessian_inv_errors, optimizer)
@@ -153,9 +154,9 @@ class Simulation:
         # tqdm with VScode bugs, have to initialize the bars outside and reset in the loop
         runs_pbar = tqdm(range(num_runs), desc="Runs", position=0, leave=True)
         optimizer_pbar = tqdm(
-            total=len(self.optimizer_list), desc="Optimizers", position=1, leave=True
+            total=len(self.optimizer_list), desc="Optimizers", position=1, leave=False
         )
-        data_pbar = tqdm(total=n, desc="Data", position=2, leave=True)
+        data_pbar = tqdm(total=n, desc="Data", position=2, leave=False)
 
         # Run the experiment multiple times
         for _ in runs_pbar:
