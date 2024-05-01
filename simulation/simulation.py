@@ -187,12 +187,15 @@ class Simulation:
     def plot_errors(self, errors: dict, title: str, ylabel: str):
         plt.figure(figsize=(10, 6))
         min_error = float("inf")
+        max_error = 0
         for name, errors in errors.items():
             plt.plot(errors, label=name)
             min_error = min(min_error, np.min(errors))
+            max_error = max(max_error, np.max(errors))
         plt.xscale("log")
         plt.yscale("log")
         plt.ylim(bottom=min(min_error, 1e-3))
+        plt.ylim(top=min(max_error, 1e5))
         plt.xlabel("Sample size")
         average = "average" if len(errors) > 1 else ""
         plt.ylabel(average + ylabel)

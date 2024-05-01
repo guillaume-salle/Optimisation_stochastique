@@ -4,7 +4,7 @@ from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
 
 
-class USNA(BaseOptimizer):
+class UWASNA(BaseOptimizer):
     """
     Universal Stochastic Newton Algorithm optimizer
     """
@@ -15,6 +15,8 @@ class USNA(BaseOptimizer):
         c_mu: float = 1.0,  # Set to 1.0 in the article
         gamma: float = 0.5,  # Not specified in the article
         c_gamma: float = 1.0,  # Not specified in the article
+        thau_theta: float = 1.0,  # Not specified in the article
+        thau_hessian: float = 1.0,  # Not specified in the article
         generate_Z: str = "normal",
         add_iter_lr: int = 20,
     ):
@@ -24,6 +26,8 @@ class USNA(BaseOptimizer):
         self.gamma = gamma
         self.c_gamma = c_gamma
         self.add_iter_lr = add_iter_lr
+        self.thau_theta = thau_theta
+        self.thau_hessian = thau_hessian
 
         # If Z is a random vector of canonic base, we can compute faster P and Q
         self.generate_Z = generate_Z
