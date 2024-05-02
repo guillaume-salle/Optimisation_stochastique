@@ -13,7 +13,7 @@ class USNA(BaseOptimizer):
         self,
         nu: float = 1.0,  # Set to 1.0 in the article
         c_nu: float = 1.0,  # Set to 1.0 in the article
-        gamma: float = 0.5,  # Not specified in the article
+        gamma: float = 0.75,  # Set to 0.75 in the article
         c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
         generate_Z: str = "normal",
         add_iter_lr: int = 20,
@@ -21,7 +21,7 @@ class USNA(BaseOptimizer):
         self.name = (
             "USNA"
             + (f" ν={nu}" if nu != 1.0 else "")
-            + (f" γ={gamma}" if gamma != 0.5 else "")
+            + (f" γ={gamma}")
             + (" Z~" + generate_Z if generate_Z != "normal" else "")
         )
         self.nu = nu
@@ -50,6 +50,20 @@ class USNA(BaseOptimizer):
         self.hessian_inv = np.eye(self.theta_dim)
         if self.generate_Z == "canonic deterministic":
             self.k = 0
+
+    def step(
+        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, g: BaseObjectiveFunction
+    ):
+        """
+        Perform one optimization step
+        """
+        self.iter += 1
+        grad, hessian = g.grad_and_hessian(X, Y, theta)
+
+        self.update_hessian(hessian)
+
+        learning_rate_theta = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
+        theta += -learning_rate_theta * self.hessian_inv @ grad
 
     def update_hessian_normal(self, hessian: np.ndarray):
         """
@@ -94,17 +108,3 @@ class USNA(BaseOptimizer):
             self.hessian_inv += -learning_rate_hessian * (
                 product + product.transpose() - 2 * np.eye(self.theta_dim)
             )
-
-    def step(
-        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, g: BaseObjectiveFunction
-    ):
-        """
-        Perform one optimization step
-        """
-        self.iter += 1
-        grad, hessian = g.grad_and_hessian(X, Y, theta)
-
-        self.update_hessian(hessian)
-
-        learning_rate_theta = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
-        theta += -learning_rate_theta * self.hessian_inv @ grad

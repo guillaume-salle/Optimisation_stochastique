@@ -81,7 +81,7 @@ class LogisticRegression(BaseObjectiveFunction):
         return grad, hessian
 
     def grad_and_riccati(
-        self, X: np.ndarray, Y: np.ndarray, h: np.ndarray
+        self, X: np.ndarray, Y: np.ndarray, h: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Ricatti of the logistic loss

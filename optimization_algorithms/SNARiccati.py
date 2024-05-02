@@ -42,7 +42,7 @@ class SNARiccati(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, phi = g.grad_and_riccati(X, Y, theta_estimate)
+        grad, phi = g.grad_and_riccati(X, Y, theta_estimate, self.iter)
         product = self.hessian_bar_inv @ phi
         denominator = 1 + np.dot(phi, product)
         if np.abs(denominator) < 1e-8:

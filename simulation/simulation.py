@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from typing import List, Tuple, Callable
 from tqdm.auto import tqdm
 from IPython.display import clear_output
+from itertools import cycle, product
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -185,28 +186,36 @@ class Simulation:
 
         self.plot_all_errors(self.theta_errors_avg, self.hessian_inv_errors_avg, N)
 
-    def plot_errors(self, errors: dict, title: str, ylabel: str, N: int):
+    def plot_errors(self, errors_dict: dict, title: str, ylabel: str, N: int):
         clear_output(
             wait=True
         )  # Clear the tqdm output, because of bug widgets after reopen
-
-        plt.figure(figsize=(10, 6))
+        n = len(self.dataset)
         min_error = float("inf")
         max_error = 0
-        for name, errors in errors.items():
-            plt.plot(errors, label=name)
+
+        plt.figure(figsize=(10, 6))
+        markers_cycle = cycle(["3", "x", "+"])
+        markevery_cycle = cycle([int(i * n / 100 + n / 11) for i in range(6)])
+        for (name, errors), mk, me in zip(
+            errors_dict.items(), markers_cycle, markevery_cycle
+        ):
+            plt.plot(errors, label=name, marker=mk, markersize=10, markevery=me)
             min_error = min(min_error, np.min(errors))
             max_error = max(max_error, np.max(errors))
+
         plt.xscale("log")
         plt.yscale("log")
-        plt.ylim(bottom=min(min_error, 1e-3))
+        # plt.ylim(bottom=min(min_error, 1e-3))
         plt.ylim(top=min(max_error, 1e5))
         plt.xlabel("Sample size")
         average = f" averaged over {N} run" + ("s" if N > 1 else "")
         plt.ylabel(ylabel + average)
         plt.title(title)
         plt.suptitle(self.g.name)
-        plt.legend()
+        plt.legend(
+            bbox_to_anchor=(1.05, 1), loc="upper left"
+        )  # Move legend outside the plot
         plt.show()
 
     def plot_all_errors(self, theta_errors: dict, hessian_inv_errors: dict, N: int):

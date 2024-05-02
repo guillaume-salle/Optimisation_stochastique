@@ -59,7 +59,7 @@ class LinearRegression(BaseObjectiveFunction):
         return grad, hessian
 
     def grad_and_riccati(
-        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray
+        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Riccati of the linear regression loss, works only for a single data point

@@ -13,9 +13,9 @@ class UWASNA(BaseOptimizer):
         self,
         nu: float = 1.0,  # Set to 1.0 in the article
         c_nu: float = 1.0,  # Set to 1.0 in the article
-        gamma: float = 0.5,  # Not specified in the article
-        c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
-        tau_theta: float = 1.0,  # Not specified in the article
+        gamma: float = 0.75,  # Set to 0.75 in the article
+        c_gamma: float = 0.1,  # Not specified in the article, 1.0 diverges
+        tau_theta: float = 2.0,  # Not specified in the article
         tau_hessian: float = 2.0,  # Not specified in the article
         generate_Z: str = "normal",
         add_iter_lr: int = 20,
@@ -23,11 +23,11 @@ class UWASNA(BaseOptimizer):
         self.name = (
             ("UWASNA" if tau_theta != 0.0 or tau_hessian != 0.0 else "USNA")
             + (f" ν={nu}" if nu != 1.0 else "")
-            + (f" γ={gamma}" if gamma != 0.5 else "")
-            + (f" τ_theta={tau_theta}" if tau_theta != 1.0 and tau_theta != 0.0 else "")
+            + (f" γ={gamma}")
+            + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
             + (
                 f" τ_hessian={tau_hessian}"
-                if tau_hessian != 1.0 and tau_theta != 0.0
+                if tau_hessian != 2.0 and tau_theta != 0.0
                 else ""
             )
             + (" Z~" + generate_Z if generate_Z != "normal" else "")
