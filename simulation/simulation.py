@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import List, Tuple, Callable
 from tqdm.auto import tqdm
+from IPython.display import clear_output
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -185,6 +186,10 @@ class Simulation:
         self.plot_all_errors(self.theta_errors_avg, self.hessian_inv_errors_avg, N)
 
     def plot_errors(self, errors: dict, title: str, ylabel: str, N: int):
+        clear_output(
+            wait=True
+        )  # Clear the tqdm output, because of bug widgets after reopen
+
         plt.figure(figsize=(10, 6))
         min_error = float("inf")
         max_error = 0

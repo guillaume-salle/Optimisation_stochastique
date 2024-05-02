@@ -14,28 +14,17 @@ class WASNA(BaseOptimizer):
         nu: float,
         c_nu: float = 1.0,
         tau_theta: float = 1.0,
-        tau_hessian: float = 1.0,
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix
     ):
         self.name = (
             ("WASNA" if tau_theta != 0.0 or tau_hessian == 0.0 else "SNA*")
             + (f" ν={nu}" if nu != 1.0 else "")
-            + (
-                f" τ_theta={tau_theta}"
-                if tau_theta != 1.0 and tau_theta != 0.0
-                else ""
-            )
-            + (
-                f" τ_hessian={tau_hessian}"
-                if tau_hessian != 1.0 and tau_theta != 0.0
-                else ""
-            )
+            + (f" τ_theta={tau_theta}" if tau_theta != 1.0 and tau_theta != 0.0 else "")
         )
         self.nu = nu
         self.c_nu = c_nu
         self.tau_theta = tau_theta
-        self.tau_hessian = tau_hessian
         self.add_iter_lr = add_iter_lr
         self.lambda_ = lambda_
 
@@ -49,8 +38,6 @@ class WASNA(BaseOptimizer):
         self.sum_weights_theta = 0
         # Weight more the initial identity matrix
         self.hessian_bar = self.lambda_ * self.theta_dim * np.eye(self.theta_dim)
-        self.hessian_inv = np.eye(self.theta_dim)
-        self.sum_weights_hessian = 0
 
     def step(
         self,
@@ -68,23 +55,16 @@ class WASNA(BaseOptimizer):
         # Update the hessian estimate
         self.hessian_bar += hessian
         try:
-            hessian_inv_not_averaged = np.linalg.inv(
+            hessian_inv = np.linalg.inv(
                 self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
             )
         except np.linalg.LinAlgError:
             # Hessian is not invertible
-            hessian_inv_not_averaged = np.eye(self.theta_dim)
-        weight_hessian = np.log(self.iter + 1) ** self.tau_hessian
-        self.sum_weights_hessian += weight_hessian
-        self.hessian_inv += (
-            (hessian_inv_not_averaged - self.hessian_inv)
-            * weight_hessian
-            / self.sum_weights_hessian
-        )
+            hessian_inv = np.eye(self.theta_dim)
 
         # Update the theta estimate
         learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
-        self.theta_not_avg += -learning_rate * self.hessian_inv @ grad
+        self.theta_not_avg += -learning_rate * hessian_inv @ grad
         weight_theta = np.log(self.iter + 1) ** self.tau_theta
         self.sum_weights_theta += weight_theta
         theta += (self.theta_not_avg - theta) * weight_theta / self.sum_weights_theta

@@ -29,9 +29,7 @@ class SNARiccati(BaseOptimizer):
         self.iter = 0
         self.theta_dim = initial_theta.shape[0]
         # Weight more the initial identity matrix
-        self.hessian_bar_inv = (
-            1 / (self.lambda_ * self.theta_dim) * np.eye(self.theta_dim)
-        )
+        self.hessian_bar_inv = np.eye(self.theta_dim) / (self.lambda_ * self.theta_dim)
 
     def step(
         self,
@@ -46,7 +44,11 @@ class SNARiccati(BaseOptimizer):
         self.iter += 1
         grad, phi = g.grad_and_riccati(X, Y, theta_estimate)
         product = self.hessian_bar_inv @ phi
-        self.hessian_bar_inv += -np.outer(product, product) / (1 + np.dot(phi, product))
+        denominator = 1 + np.dot(phi, product)
+        if np.abs(denominator) < 1e-8:
+            print("Denominator too small, update skipped")
+        else:
+            self.hessian_bar_inv += -np.outer(product, product) / denominator
         learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         theta_estimate += (
             -learning_rate

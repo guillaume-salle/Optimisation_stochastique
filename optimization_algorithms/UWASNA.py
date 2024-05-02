@@ -14,16 +14,16 @@ class UWASNA(BaseOptimizer):
         nu: float = 1.0,  # Set to 1.0 in the article
         c_nu: float = 1.0,  # Set to 1.0 in the article
         gamma: float = 0.5,  # Not specified in the article
-        c_gamma: float = 1.0,  # Not specified in the article
+        c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
         tau_theta: float = 1.0,  # Not specified in the article
-        tau_hessian: float = 1.0,  # Not specified in the article
+        tau_hessian: float = 2.0,  # Not specified in the article
         generate_Z: str = "normal",
         add_iter_lr: int = 20,
     ):
         self.name = (
             ("UWASNA" if tau_theta != 0.0 or tau_hessian != 0.0 else "USNA")
             + (f" ν={nu}" if nu != 1.0 else "")
-            + (f" \gamma={gamma}" if gamma != 0.5 else "")
+            + (f" γ={gamma}" if gamma != 0.5 else "")
             + (f" τ_theta={tau_theta}" if tau_theta != 1.0 and tau_theta != 0.0 else "")
             + (
                 f" τ_hessian={tau_hessian}"
