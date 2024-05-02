@@ -11,14 +11,14 @@ class SNA(BaseOptimizer):
 
     def __init__(
         self,
-        mu: float,
-        c_mu: float = 1.0,
+        nu: float,
+        c_nu: float = 1.0,
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
     ):
-        self.name = "SNA" + rf" \mu={mu}"
-        self.mu = mu
-        self.c_mu = c_mu
+        self.name = "SNA" + f" ν={nu}"
+        self.nu = nu
+        self.c_nu = c_nu
         self.add_iter_lr = add_iter_lr
         self.lambda_ = lambda_
 
@@ -50,5 +50,5 @@ class SNA(BaseOptimizer):
         except np.linalg.LinAlgError:
             # Hessian is not invertible
             hessian_inv = np.eye(self.theta_dim)
-        learning_rate = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
+        learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         theta += -learning_rate * hessian_inv @ grad

@@ -11,8 +11,8 @@ class USNA(BaseOptimizer):
 
     def __init__(
         self,
-        mu: float = 1.0,  # Set to 1.0 in the article
-        c_mu: float = 1.0,  # Set to 1.0 in the article
+        nu: float = 1.0,  # Set to 1.0 in the article
+        c_nu: float = 1.0,  # Set to 1.0 in the article
         gamma: float = 0.5,  # Not specified in the article
         c_gamma: float = 1.0,  # Not specified in the article
         generate_Z: str = "normal",
@@ -20,12 +20,12 @@ class USNA(BaseOptimizer):
     ):
         self.name = (
             "USNA"
-            + (rf" \mu={mu}" if mu != 1.0 else "")
-            + (rf" \gamma={gamma}" if gamma != 0.5 else "")
-            + ("Z~" + generate_Z if generate_Z != "normal" else "")
+            + (f" ν={nu}" if nu != 1.0 else "")
+            + (f" \gamma={gamma}" if gamma != 0.5 else "")
+            + (" Z~" + generate_Z if generate_Z != "normal" else "")
         )
-        self.mu = mu
-        self.c_mu = c_mu
+        self.nu = nu
+        self.c_nu = c_nu
         self.gamma = gamma
         self.c_gamma = c_gamma
         self.add_iter_lr = add_iter_lr
@@ -95,9 +95,6 @@ class USNA(BaseOptimizer):
                 product + product.transpose() - 2 * np.eye(self.theta_dim)
             )
 
-        learning_rate_theta = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
-        theta += -learning_rate_theta * self.hessian_inv @ grad
-
     def step(
         self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, g: BaseObjectiveFunction
     ):
@@ -109,5 +106,5 @@ class USNA(BaseOptimizer):
 
         self.update_hessian(hessian)
 
-        learning_rate_theta = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
+        learning_rate_theta = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         theta += -learning_rate_theta * self.hessian_inv @ grad

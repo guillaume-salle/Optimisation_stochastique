@@ -130,11 +130,11 @@ class Simulation:
             data_pbar.close()
 
         if plot:
-            self.plot_all_errors(theta_errors, hessian_inv_errors)
+            self.plot_all_errors(theta_errors, hessian_inv_errors, 1)
 
         return theta_errors, hessian_inv_errors
 
-    def run_multiple_datasets(self, num_runs: int = 100, n: int = 10_000):
+    def run_multiple_datasets(self, N: int = 100, n: int = 10_000):
         """
         Run the experiment multiple times by generating a new dataset and initial theta each time
         """
@@ -152,7 +152,7 @@ class Simulation:
         )
 
         # tqdm with VScode bugs, have to initialize the bars outside and reset in the loop
-        runs_pbar = tqdm(range(num_runs), desc="Runs", position=0, leave=True)
+        runs_pbar = tqdm(range(N), desc="Runs", position=0, leave=True)
         optimizer_pbar = tqdm(
             total=len(self.optimizer_list), desc="Optimizers", position=1, leave=False
         )
@@ -173,18 +173,18 @@ class Simulation:
 
         # Average the errors
         for name, errors in self.theta_errors_avg.items():
-            errors /= num_runs
+            errors /= N
         if self.true_hessian_inv is not None:
             for name, errors in self.hessian_inv_errors_avg.items():
-                errors /= num_runs
+                errors /= N
 
         data_pbar.close()
         optimizer_pbar.close()
         runs_pbar.close()
 
-        self.plot_all_errors(self.theta_errors_avg, self.hessian_inv_errors_avg)
+        self.plot_all_errors(self.theta_errors_avg, self.hessian_inv_errors_avg, N)
 
-    def plot_errors(self, errors: dict, title: str, ylabel: str):
+    def plot_errors(self, errors: dict, title: str, ylabel: str, N: int):
         plt.figure(figsize=(10, 6))
         min_error = float("inf")
         max_error = 0
@@ -197,24 +197,24 @@ class Simulation:
         plt.ylim(bottom=min(min_error, 1e-3))
         plt.ylim(top=min(max_error, 1e5))
         plt.xlabel("Sample size")
-        average = "average" if len(errors) > 1 else ""
-        plt.ylabel(average + ylabel)
+        average = f" averaged over {N} run" + ("s" if N > 1 else "")
+        plt.ylabel(ylabel + average)
         plt.title(title)
         plt.suptitle(self.g.name)
         plt.legend()
         plt.show()
 
-    def plot_all_errors(self, theta_errors: dict, hessian_inv_errors: dict):
+    def plot_all_errors(self, theta_errors: dict, hessian_inv_errors: dict, N: int):
         """
         Plot the errors of estimated theta and hessian inverse of all optimizers
         """
         if self.true_theta is not None:
             self.plot_errors(
-                theta_errors, f"e = {self.e}", r"$\| \theta - \theta^* \|^2$"
+                theta_errors, f"e = {self.e}", r"$\| \theta - \theta^* \|^2$", N
             )
         if self.true_hessian_inv is not None:
             self.plot_errors(
-                hessian_inv_errors, f"e = {self.e}", r"$\| H^{-1} - H^{-1*} \|_F$"
+                hessian_inv_errors, f"e = {self.e}", r"$\| H^{-1} - H^{-1*} \|_F$", N
             )
 
     plt.show()

@@ -11,14 +11,14 @@ class SNARiccati(BaseOptimizer):
 
     def __init__(
         self,
-        mu: float,
-        c_mu: float = 1.0,
+        nu: float,
+        c_nu: float = 1.0,
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
     ):
-        self.name = "SNA-Riccati" + rf" \mu={mu}"
-        self.mu = mu
-        self.c_mu = c_mu
+        self.name = "SNA-Riccati" + f" ν={nu}"
+        self.nu = nu
+        self.c_nu = c_nu
         self.add_iter_lr = add_iter_lr
         self.lambda_ = lambda_
 
@@ -47,7 +47,7 @@ class SNARiccati(BaseOptimizer):
         grad, phi = g.grad_and_riccati(X, Y, theta_estimate)
         product = self.hessian_bar_inv @ phi
         self.hessian_bar_inv += -np.outer(product, product) / (1 + np.dot(phi, product))
-        learning_rate = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
+        learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         theta_estimate += (
             -learning_rate
             * (self.iter + self.lambda_ * self.theta_dim)

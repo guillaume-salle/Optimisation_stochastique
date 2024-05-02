@@ -11,16 +11,16 @@ class WASGD(BaseOptimizer):
     """
 
     def __init__(
-        self, mu: float, c_mu: float = 1.0, thau: float = 1.0, add_iter_lr: int = 20
+        self, nu: float, c_mu: float = 1.0, tau: float = 1.0, add_iter_lr: int = 20
     ):
         self.name = (
-            ("WASGD" if thau != 0.0 else "ASGD")
-            + (rf" \mu={mu}" if mu != 1.0 else "")
-            + (rf" \thau={thau}" if thau != 1.0 and thau != 0.0 else "")
+            ("WASGD" if tau != 0.0 else "ASGD")
+            + (f" ν={nu}" if nu != 1.0 else "")
+            + (f" τ={tau}" if tau != 1.0 and tau != 0.0 else "")
         )
-        self.mu = mu
-        self.c_mu = c_mu
-        self.thau = thau
+        self.nu = nu
+        self.c_nu = c_mu
+        self.tau = tau
         self.add_iter_lr = add_iter_lr  # Dont start at 0 to avoid large learning rates at the beginning
 
     def reset(self, initial_theta: np.ndarray):
@@ -43,9 +43,9 @@ class WASGD(BaseOptimizer):
         """
         self.iter += 1
         grad = g.grad(X, Y, self.theta_not_averaged)
-        learning_rate = self.c_mu * ((self.iter + self.add_iter_lr) ** (-self.mu))
+        learning_rate = self.c_nu * ((self.iter + self.add_iter_lr) ** (-self.nu))
         self.theta_not_averaged += -learning_rate * grad
 
-        weight = np.log(self.iter + 1) ** self.thau
+        weight = np.log(self.iter + 1) ** self.tau
         self.sum_weights += weight
         theta += (self.theta_not_averaged - theta) * weight / self.sum_weights

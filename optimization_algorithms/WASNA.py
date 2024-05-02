@@ -11,33 +11,31 @@ class WASNA(BaseOptimizer):
 
     def __init__(
         self,
-        mu: float,
-        c_mu: float = 1.0,
-        thau_theta: float = 1.0,
-        thau_hessian: float = 1.0,
+        nu: float,
+        c_nu: float = 1.0,
+        tau_theta: float = 1.0,
+        tau_hessian: float = 1.0,
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix
     ):
         self.name = (
-            "WASNA"
-            if thau_theta != 0.0 or thau_hessian == 0.0
-            else "SNA*"
-            + (rf" \mu={mu}" if mu != 1.0 else "")
+            ("WASNA" if tau_theta != 0.0 or tau_hessian == 0.0 else "SNA*")
+            + (f" ν={nu}" if nu != 1.0 else "")
             + (
-                rf" \thau_theta={thau_theta}"
-                if thau_theta != 1.0 and thau_theta != 0.0
+                f" τ_theta={tau_theta}"
+                if tau_theta != 1.0 and tau_theta != 0.0
                 else ""
             )
             + (
-                rf" \thau_hessian={thau_hessian}"
-                if thau_hessian != 1.0 and thau_theta != 0.0
+                f" τ_hessian={tau_hessian}"
+                if tau_hessian != 1.0 and tau_theta != 0.0
                 else ""
             )
         )
-        self.mu = mu
-        self.c_mu = c_mu
-        self.thau_theta = thau_theta
-        self.thau_hessian = thau_hessian
+        self.nu = nu
+        self.c_nu = c_nu
+        self.tau_theta = tau_theta
+        self.tau_hessian = tau_hessian
         self.add_iter_lr = add_iter_lr
         self.lambda_ = lambda_
 
@@ -76,7 +74,7 @@ class WASNA(BaseOptimizer):
         except np.linalg.LinAlgError:
             # Hessian is not invertible
             hessian_inv_not_averaged = np.eye(self.theta_dim)
-        weight_hessian = np.log(self.iter + 1) ** self.thau_hessian
+        weight_hessian = np.log(self.iter + 1) ** self.tau_hessian
         self.sum_weights_hessian += weight_hessian
         self.hessian_inv += (
             (hessian_inv_not_averaged - self.hessian_inv)
@@ -85,8 +83,8 @@ class WASNA(BaseOptimizer):
         )
 
         # Update the theta estimate
-        learning_rate = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
+        learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         self.theta_not_avg += -learning_rate * self.hessian_inv @ grad
-        weight_theta = np.log(self.iter + 1) ** self.thau_theta
+        weight_theta = np.log(self.iter + 1) ** self.tau_theta
         self.sum_weights_theta += weight_theta
         theta += (self.theta_not_avg - theta) * weight_theta / self.sum_weights_theta
