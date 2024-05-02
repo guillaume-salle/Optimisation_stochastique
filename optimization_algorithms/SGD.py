@@ -11,7 +11,7 @@ class SGD(BaseOptimizer):
     """
 
     def __init__(self, mu: float, c_mu: float = 1.0, add_iter_lr: int = 20):
-        self.name = f"SGD mu={mu}"
+        self.name = "SGD" + rf" \mu={mu}"
         self.mu = mu
         self.c_mu = c_mu
         self.add_iter_lr = add_iter_lr  # Dont start at 0 to avoid large learning rates at the beginning

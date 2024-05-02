@@ -16,7 +16,7 @@ class SNARiccati(BaseOptimizer):
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
     ):
-        self.name = f"RiccatiSNA mu={mu}"
+        self.name = "SNA-Riccati" + rf" \mu={mu}"
         self.mu = mu
         self.c_mu = c_mu
         self.add_iter_lr = add_iter_lr
@@ -28,9 +28,7 @@ class SNARiccati(BaseOptimizer):
         """
         self.iter = 0
         self.theta_dim = initial_theta.shape[0]
-
         # Weight more the initial identity matrix
-        self.hessian_bar = self.lambda_ * self.theta_dim * np.eye(self.theta_dim)
         self.hessian_bar_inv = (
             1 / (self.lambda_ * self.theta_dim) * np.eye(self.theta_dim)
         )

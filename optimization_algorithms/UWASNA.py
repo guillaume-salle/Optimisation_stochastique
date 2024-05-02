@@ -20,21 +20,37 @@ class UWASNA(BaseOptimizer):
         generate_Z: str = "normal",
         add_iter_lr: int = 20,
     ):
-        self.name = "USNA" + f" mu={mu}" if mu != 1.0 else "" + f"gamma={gamma}"
+        self.name = (
+            "UWASNA"
+            if thau_theta != 0.0 or thau_hessian != 0.0
+            else "USNA"
+            + (rf" \mu={mu}" if mu != 1.0 else "")
+            + (rf" \gamma={gamma}" if gamma != 0.5 else "")
+            + (
+                rf" \thau_theta={thau_theta}"
+                if thau_theta != 1.0 and thau_theta != 0.0
+                else ""
+            )
+            + (
+                rf" \thau_hessian={thau_hessian}"
+                if thau_hessian != 1.0 and thau_theta != 0.0
+                else ""
+            )
+        )
         self.mu = mu
         self.c_mu = c_mu
         self.gamma = gamma
         self.c_gamma = c_gamma
-        self.add_iter_lr = add_iter_lr
         self.thau_theta = thau_theta
         self.thau_hessian = thau_hessian
+        self.add_iter_lr = add_iter_lr
 
         # If Z is a random vector of canonic base, we can compute faster P and Q
         self.generate_Z = generate_Z
         if generate_Z == "normal":
-            self.step = self.step_normal
+            self.update_hessian = self.update_hessian_normal
         elif generate_Z == "canonic" or generate_Z == "canonic deterministic":
-            self.step = self.step_canonic
+            self.update_hessian = self.update_hessian_canonic
         else:
             raise ValueError(
                 "Invalid value for Z. Choose 'normal', 'canonic' or 'canonic deterministic'."
@@ -46,19 +62,21 @@ class UWASNA(BaseOptimizer):
         """
         self.iter = 0
         self.theta_dim = initial_theta.shape[0]
+        self.theta_not_avg = np.copy(initial_theta)
+        self.sum_weights_theta = 0
+        self.hessian_inv_not_avg = np.eye(self.theta_dim)
         self.hessian_inv = np.eye(self.theta_dim)
+        self.sum_weights_hessian = 0
+        if self.generate_Z == "canonic deterministic":
+            self.k = 0
 
-    def step_normal(
-        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, g: BaseObjectiveFunction
-    ):
+    def update_hessian_normal(self, hessian: np.ndarray):
         """
-        Perform one optimization step
+        Update the hessian estimate with a normal random vector
         """
-        self.iter += 1
-        grad, hessian = g.grad_and_hessian(X, Y, theta)
-
         Z = np.random.randn(self.theta_dim)
-        P = self.hessian_inv @ Z
+        # Use the non averaged hessian to compute P
+        P = self.hessian_inv_not_avg @ Z
         Q = hessian @ Z
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (
             -self.gamma
@@ -66,41 +84,62 @@ class UWASNA(BaseOptimizer):
         beta = 1 / (2 * learning_rate_hessian)
         if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
             product = np.outer(P, Q)
-            self.hessian_inv += -learning_rate_hessian * (
+            self.hessian_inv_not_avg += -learning_rate_hessian * (
                 product + product.transpose() - 2 * np.eye(self.theta_dim)
             )
 
-        learning_rate_theta = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
-        theta += -learning_rate_theta * self.hessian_inv @ grad
+    def update_hessian_canonic(self, hessian: np.ndarray):
+        """
+        Update the hessian estimate with a canonic base random vector
+        """
+        if self.generate_Z == "canonic":
+            z = np.random.randint(0, self.theta_dim)
+        elif self.generate_Z == "canonic deterministic":
+            z = self.k
+            self.k += 1
+            self.k = self.k % self.theta_dim
+        else:
+            raise ValueError(
+                "Invalid value for Z. Choose 'canonic' or 'canonic deterministic'."
+            )
 
-    def step_canonic(
+        # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later
+        P = self.hessian_inv_not_avg[:, z]  # Use the non averaged hessian to compute P
+        Q = hessian[:, z]
+        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (
+            -self.gamma
+        )
+        beta = 1 / (2 * learning_rate_hessian)
+        if np.dot(Q, Q) * self.theta_dim <= beta**2:
+            product = self.theta_dim * np.outer(P, Q)  # Multiply by the dimension
+            self.hessian_inv_not_avg += -learning_rate_hessian * (
+                product + product.transpose() - 2 * np.eye(self.theta_dim)
+            )
+
+    def step(
         self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, g: BaseObjectiveFunction
     ):
         """
         Perform one optimization step
         """
         self.iter += 1
-        grad, hessian = g.grad_and_hessian(X, Y, theta)
+        grad = g.grad(X, Y, self.theta_not_avg)  # gradient in the NOT averaged theta
+        hessian = g.hessian(X, Y, theta)  # hessian in the averaged theta
 
-        if self.generate_Z == "canonic":
-            z = np.random.randint(0, self.theta_dim)
-        elif self.generate_Z == "canonic deterministic":
-            z = (self.iter - 1) % self.theta_dim
-        else:
-            raise ValueError(
-                "Invalid value for Z. Choose 'canonic' or 'canonic deterministic'."
-            )
-        P = self.hessian_inv[:, z]
-        Q = hessian[:, z]
-        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (
-            -self.gamma
+        self.update_hessian(hessian)
+
+        # Update the averaged hessian
+        weight_hessian = np.log(self.iter + 1) ** self.thau_hessian
+        self.sum_weights_hessian += weight_hessian
+        self.hessian_inv += (
+            (self.hessian_inv_not_avg - self.hessian_inv)
+            * weight_hessian
+            / self.sum_weights_hessian
         )
-        beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) <= self.theta_dim * beta**2:
-            product = self.theta_dim * np.outer(P, Q)
-            self.hessian_inv += -learning_rate_hessian * (
-                product + product.transpose() - 2 * np.eye(self.theta_dim)
-            )
 
+        # Update the theta estimate with the averaged hessian
         learning_rate_theta = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
-        theta += -learning_rate_theta * self.hessian_inv @ grad
+        self.theta_not_avg += -learning_rate_theta * self.hessian_inv @ grad
+        weight_theta = np.log(self.iter + 1) ** self.thau_theta
+        self.sum_weights_theta += weight_theta
+        theta += (self.theta_not_avg - theta) * weight_theta / self.sum_weights_theta

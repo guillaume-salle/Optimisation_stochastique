@@ -56,11 +56,11 @@ class Simulation:
         self.initial_theta = loc + self.e * np.random.randn(theta_dim)
 
     def log_estimation_error(self, theta_errors, hessian_inv_errors, optimizer):
-        if theta_errors is not None:
+        if self.true_theta is not None:
             theta_errors[optimizer.name].append(
                 np.dot(self.theta - self.true_theta, self.theta - self.true_theta)
             )
-        if hessian_inv_errors is not None and optimizer.hessian_inv is not None:
+        if self.true_hessian_inv is not None and optimizer.hessian_inv is not None:
             hessian_inv_errors[optimizer.name].append(
                 np.linalg.norm(optimizer.hessian_inv - self.true_hessian_inv, ord="fro")
             )
@@ -161,7 +161,6 @@ class Simulation:
         # Run the experiment multiple times
         for _ in runs_pbar:
             self.dataset = self.generate_dataset(n, self.true_theta)
-            first_X, _ = self.dataset[0]
             self.generate_initial_theta()
             theta_errors, hessian_inv_errors = self.run([optimizer_pbar, data_pbar])
 

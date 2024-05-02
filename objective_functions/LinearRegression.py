@@ -38,6 +38,13 @@ class LinearRegression(BaseObjectiveFunction):
         error = Y_pred - Y
         return error * phi
 
+    def hessian(self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray) -> np.ndarray:
+        """
+        Compute the Hessian of the linear regression loss, works only for a single data point
+        """
+        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
+        return np.outer(phi, phi)
+
     def grad_and_hessian(
         self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:

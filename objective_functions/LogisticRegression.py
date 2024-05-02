@@ -46,6 +46,16 @@ class LogisticRegression(BaseObjectiveFunction):
         grad = (p - Y) * phi  # Equivalent
         return grad
 
+    def hessian(self, X: np.ndarray, Y: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """
+        Compute the Hessian of the logistic loss, works only for a single data point
+        """
+        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
+        dot_product = np.dot(phi, h)
+        p = sigmoid(dot_product)
+        hessian = p * (1 - p) * np.outer(phi, phi)
+        return hessian
+
     def grad_and_hessian(
         self, X: np.ndarray, Y: np.ndarray, h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:

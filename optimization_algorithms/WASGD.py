@@ -13,12 +13,11 @@ class WASGD(BaseOptimizer):
     def __init__(
         self, mu: float, c_mu: float = 1.0, thau: float = 1.0, add_iter_lr: int = 20
     ):
-        if thau == 0:
-            self.name = f"ASGD mu={mu}"
-        elif thau == 1.0:
-            self.name = f"WASGD mu={mu}"
-        else:
-            self.name = f"WASGD mu={mu} thau={thau}"
+        self.name = (
+            ("WASGD" if thau != 0.0 else "ASGD")
+            + (rf" \mu={mu}" if mu != 1.0 else "")
+            + (rf" \thau={thau}" if thau != 1.0 and thau != 0.0 else "")
+        )
         self.mu = mu
         self.c_mu = c_mu
         self.thau = thau
@@ -30,7 +29,7 @@ class WASGD(BaseOptimizer):
         """
         self.iter = 0
         self.theta_not_averaged = np.copy(initial_theta)
-        self.sum_avg_coeff = 0
+        self.sum_weights = 0
 
     def step(
         self,
@@ -47,6 +46,6 @@ class WASGD(BaseOptimizer):
         learning_rate = self.c_mu * ((self.iter + self.add_iter_lr) ** (-self.mu))
         self.theta_not_averaged += -learning_rate * grad
 
-        avg_coeff = np.log(self.iter + 1) ** self.thau
-        self.sum_avg_coeff += avg_coeff
-        theta += (self.theta_not_averaged - theta) * avg_coeff / self.sum_avg_coeff
+        weight = np.log(self.iter + 1) ** self.thau
+        self.sum_weights += weight
+        theta += (self.theta_not_averaged - theta) * weight / self.sum_weights

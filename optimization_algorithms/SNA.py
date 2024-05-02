@@ -16,7 +16,7 @@ class SNA(BaseOptimizer):
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
     ):
-        self.name = f"SNA mu={mu}"
+        self.name = "SNA" + rf" \mu={mu}"
         self.mu = mu
         self.c_mu = c_mu
         self.add_iter_lr = add_iter_lr
@@ -34,14 +34,14 @@ class SNA(BaseOptimizer):
         self,
         X: np.ndarray,
         Y: np.ndarray,
-        theta_estimate: np.ndarray,
+        theta: np.ndarray,
         g: BaseObjectiveFunction,
     ):
         """
         Perform one optimization step
         """
         self.iter += 1
-        grad, hessian = g.grad_and_hessian(X, Y, theta_estimate)
+        grad, hessian = g.grad_and_hessian(X, Y, theta)
         self.hessian_bar += hessian
         try:
             hessian_inv = np.linalg.inv(
@@ -49,6 +49,6 @@ class SNA(BaseOptimizer):
             )
         except np.linalg.LinAlgError:
             # Hessian is not invertible
-            hessian_inv = np.eye(theta_estimate.shape[0])
+            hessian_inv = np.eye(self.theta_dim)
         learning_rate = self.c_mu * (self.iter + self.add_iter_lr) ** (-self.mu)
-        theta_estimate += -learning_rate * hessian_inv @ grad
+        theta += -learning_rate * hessian_inv @ grad
