@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -44,8 +45,7 @@ class WASNARiccati(BaseOptimizer):
 
     def step(
         self,
-        X: np.ndarray,
-        Y: np.ndarray,
+        data: Any,
         theta: np.ndarray,
         g: BaseObjectiveFunction,
     ):
@@ -53,7 +53,7 @@ class WASNARiccati(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, phi = g.grad_and_riccati(X, Y, theta, self.iter)
+        grad, phi = g.grad_and_riccati(data, theta, self.iter)
 
         # Update the hessian estimate
         product = self.hessian_bar_inv @ phi

@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -111,15 +112,13 @@ class UWASNA(BaseOptimizer):
                 product + product.transpose() - 2 * np.eye(self.theta_dim)
             )
 
-    def step(
-        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, g: BaseObjectiveFunction
-    ):
+    def step(self, data: Any, theta: np.ndarray, g: BaseObjectiveFunction):
         """
         Perform one optimization step
         """
         self.iter += 1
-        grad = g.grad(X, Y, self.theta_not_avg)  # gradient in the NOT averaged theta
-        hessian = g.hessian(X, Y, theta)  # hessian in the averaged theta
+        grad = g.grad(data, self.theta_not_avg)  # gradient in the NOT averaged theta
+        hessian = g.hessian(data, theta)  # hessian in the averaged theta
 
         self.update_hessian(hessian)
 

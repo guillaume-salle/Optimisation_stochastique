@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -33,8 +34,7 @@ class SNARiccati(BaseOptimizer):
 
     def step(
         self,
-        X: np.ndarray,
-        Y: np.ndarray,
+        data: Any,
         theta_estimate: np.ndarray,
         g: BaseObjectiveFunction,
     ):
@@ -42,7 +42,7 @@ class SNARiccati(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, phi = g.grad_and_riccati(X, Y, theta_estimate, self.iter)
+        grad, phi = g.grad_and_riccati(data, theta_estimate, self.iter)
         product = self.hessian_bar_inv @ phi
         denominator = 1 + np.dot(phi, product)
         if np.abs(denominator) < 1e-8:

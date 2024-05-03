@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -41,8 +42,7 @@ class WASNA(BaseOptimizer):
 
     def step(
         self,
-        X: np.ndarray,
-        Y: np.ndarray,
+        data: Any,
         theta: np.ndarray,
         g: BaseObjectiveFunction,
     ):
@@ -50,7 +50,7 @@ class WASNA(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, hessian = g.grad_and_hessian(X, Y, theta)
+        grad, hessian = g.grad_and_hessian(data, theta)
 
         # Update the hessian estimate
         self.hessian_bar += hessian

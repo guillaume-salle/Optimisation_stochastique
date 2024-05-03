@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Tuple
+from typing import Any, Tuple
 
 from objective_functions import BaseObjectiveFunction
 
@@ -13,60 +13,66 @@ class LinearRegression(BaseObjectiveFunction):
         self.bias = bias
         self.name = "Linear model"
 
-    def __call__(self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray) -> np.ndarray:
+    def __call__(self, X: Any, theta: np.ndarray) -> np.ndarray:
         """
         Compute the linear regression loss, works with a batch or a single data point
         """
-        X = np.atleast_2d(X)
-        phi = np.hstack([np.ones((X.shape[0], 1)), X]) if self.bias else X
+        x, y = X
+        x = np.atleast_2d(x)
+        phi = np.hstack([np.ones((x.shape[0], 1)), x]) if self.bias else x
         Y_pred = np.dot(phi, theta)
-        error = Y_pred - Y
+        error = Y_pred - y
         return 0.5 * np.dot(error, error)
 
-    def get_theta_dim(self, X: np.ndarray) -> int:
+    def get_theta_dim(self, X: Any) -> int:
         """
         Return the dimension of theta
         """
-        return X.shape[-1] + 1 if self.bias else X.shape[-1]
+        x, _ = X
+        return x.shape[-1] + 1 if self.bias else x.shape[-1]
 
-    def grad(self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray) -> np.ndarray:
+    def grad(self, X: Any, theta: np.ndarray) -> np.ndarray:
         """
         Compute the gradient of the linear regression loss, works only for a single data point
         """
-        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
+        x, y = X
+        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
         Y_pred = np.dot(phi, theta)
-        error = Y_pred - Y
+        error = Y_pred - y
         return error * phi
 
-    def hessian(self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray) -> np.ndarray:
+    def hessian(self, X: Any, theta: np.ndarray) -> np.ndarray:
         """
         Compute the Hessian of the linear regression loss, works only for a single data point
         """
-        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
+        x, y = X
+        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
         return np.outer(phi, phi)
 
     def grad_and_hessian(
-        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray
+        self, X: Any, theta: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Hessian of the linear regression loss, works only for a single data point
         """
-        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
+        x, y = X
+        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
         Y_pred = np.dot(phi, theta)
-        error = Y_pred - Y
+        error = Y_pred - y
         grad = error * phi
         hessian = np.outer(phi, phi)
         return grad, hessian
 
     def grad_and_riccati(
-        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, iter: int = None
+        self, X: Any, theta: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Riccati of the linear regression loss, works only for a single data point
         """
-        phi = np.hstack([np.ones((1,)), X]) if self.bias else X
+        x, y = X
+        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
         Y_pred = np.dot(phi, theta)
-        error = Y_pred - Y
+        error = Y_pred - y
         grad = error * phi
         riccati = phi
         return grad, riccati

@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -32,8 +33,7 @@ class SNA(BaseOptimizer):
 
     def step(
         self,
-        X: np.ndarray,
-        Y: np.ndarray,
+        data: Any,
         theta: np.ndarray,
         g: BaseObjectiveFunction,
     ):
@@ -41,7 +41,7 @@ class SNA(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, hessian = g.grad_and_hessian(X, Y, theta)
+        grad, hessian = g.grad_and_hessian(data, theta)
         self.hessian_bar += hessian
         try:
             hessian_inv = np.linalg.inv(

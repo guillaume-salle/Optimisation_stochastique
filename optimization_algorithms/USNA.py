@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -51,14 +52,12 @@ class USNA(BaseOptimizer):
         if self.generate_Z == "canonic deterministic":
             self.k = 0
 
-    def step(
-        self, X: np.ndarray, Y: np.ndarray, theta: np.ndarray, g: BaseObjectiveFunction
-    ):
+    def step(self, data: Any, theta: np.ndarray, g: BaseObjectiveFunction):
         """
         Perform one optimization step
         """
         self.iter += 1
-        grad, hessian = g.grad_and_hessian(X, Y, theta)
+        grad, hessian = g.grad_and_hessian(data, theta)
 
         self.update_hessian(hessian)
 

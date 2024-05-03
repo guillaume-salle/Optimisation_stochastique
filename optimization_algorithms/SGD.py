@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -24,8 +25,7 @@ class SGD(BaseOptimizer):
 
     def step(
         self,
-        X: np.ndarray,
-        Y: np.ndarray,
+        data: Any,
         theta_estimate: np.ndarray,
         g: BaseObjectiveFunction,
     ):
@@ -33,6 +33,6 @@ class SGD(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad = g.grad(X, Y, theta_estimate)
+        grad = g.grad(data, theta_estimate)
         learning_rate = self.c_nu * ((self.iter + self.add_iter_lr) ** (-self.nu))
         theta_estimate += -learning_rate * grad

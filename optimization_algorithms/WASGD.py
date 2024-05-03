@@ -1,4 +1,5 @@
 import numpy as np
+from typing import Any
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -33,8 +34,7 @@ class WASGD(BaseOptimizer):
 
     def step(
         self,
-        X: np.ndarray,
-        Y: np.ndarray,
+        data: Any,
         theta: np.ndarray,
         g: BaseObjectiveFunction,
     ):
@@ -42,7 +42,7 @@ class WASGD(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad = g.grad(X, Y, self.theta_not_averaged)
+        grad = g.grad(data, self.theta_not_averaged)
         learning_rate = self.c_nu * ((self.iter + self.add_iter_lr) ** (-self.nu))
         self.theta_not_averaged += -learning_rate * grad
 

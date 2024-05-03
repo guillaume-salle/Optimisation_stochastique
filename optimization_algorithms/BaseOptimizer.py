@@ -1,5 +1,5 @@
 import numpy as np
-from typing import Callable
+from typing import Any
 from abc import ABC, abstractmethod
 
 from objective_functions import BaseObjectiveFunction
@@ -23,8 +23,7 @@ class BaseOptimizer(ABC):
 
     def step(
         self,
-        X: np.ndarray,
-        Y: np.ndarray,
+        data: Any,
         thea_estimate: np.ndarray,
         g: BaseObjectiveFunction,
     ) -> None:
