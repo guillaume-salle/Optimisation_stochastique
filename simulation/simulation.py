@@ -172,7 +172,7 @@ class Simulation:
         return theta_errors, hessian_inv_errors
 
     def run_multiple_datasets(
-        self, N: int = 100, n: int = 10_000, e_values: list = [1, 2]
+        self, N: int = 100, n: int = 10_000, e_values: list = [1, 2], save=False
     ):
         """
         Run the experiment multiple times by generating a new dataset and initial theta each time
@@ -229,7 +229,7 @@ class Simulation:
         optimizer_pbar.close()
         runs_pbar.close()
 
-        self.plot_all_errors(all_theta_errors_avg, all_hessian_inv_errors_avg, N)
+        self.plot_all_errors(all_theta_errors_avg, all_hessian_inv_errors_avg, N, plot=True)
 
     def plot_errors(self, all_errors_avg: dict, error_type: str, ylabel: str, N: int):
         """
