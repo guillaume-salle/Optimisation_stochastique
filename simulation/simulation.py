@@ -22,13 +22,13 @@ class Simulation:
         self,
         g: BaseObjectiveFunction,
         optimizer_list: List[BaseOptimizer],
-        e_list: List[float] = [1, 2],
         dataset: Dataset = None,
         test_dataset: Dataset = None,
         generate_dataset: Callable = None,
         true_theta: np.ndarray = None,
         true_hessian_inv: np.ndarray = None,
         initial_theta: np.ndarray = None,
+        e_values: List[float] = [1.0, 2.0],
     ):
         """
         Initialize the experiment
@@ -43,12 +43,12 @@ class Simulation:
         self.dataset = dataset
         self.test_dataset = test_dataset
         self.generate_dataset = generate_dataset
-        self.e_list = e_list
         self.true_theta = true_theta
         self.true_hessian_inv = true_hessian_inv
         self.initial_theta = initial_theta
+        self.e_values = e_values
 
-    def generate_initial_theta(self):
+    def generate_initial_theta(self, e: float = 1.0):
         """
         Generate a random initial theta
         """
@@ -59,10 +59,8 @@ class Simulation:
             raise ValueError(
                 f"true_theta dim ({self.true_theta.shape[0]}) does not match the dim of theta ({theta_dim}) for g"
             )
-        if self.e is None:
-            raise ValueError("e is not set for generating random theta")
         loc = self.true_theta if self.true_theta is not None else np.zeros(theta_dim)
-        self.initial_theta = loc + self.e * np.random.randn(theta_dim)
+        self.initial_theta = loc + e * np.random.randn(theta_dim)
 
     def log_estimation_error(
         self, theta_errors: dict, hessian_inv_errors: dict, optimizer
@@ -74,22 +72,6 @@ class Simulation:
         if self.true_hessian_inv is not None and optimizer.hessian_inv is not None:
             hessian_inv_errors[optimizer.name].append(
                 np.linalg.norm(optimizer.hessian_inv - self.true_hessian_inv, ord="fro")
-            )
-
-    @staticmethod
-    def highlight_max(data):
-        """
-        Highlight the maximum in a DataFrame or Series row with bold font
-        """
-        attr = "font-weight: bold"
-        if data.ndim == 1:  # Series from a DataFrame.apply(axis=1)
-            is_max = data == data.max()
-            return [attr if v else "" for v in is_max]
-        else:  # DataFrame direct styling
-            return pd.DataFrame(
-                np.where(data == data.max(axis=1)[:, None], attr, ""),
-                index=data.index,
-                columns=data.columns,
             )
 
     def run(self, pbars: Tuple[tqdm, tqdm] = None) -> Tuple[List[float], List[float]]:
@@ -171,9 +153,7 @@ class Simulation:
 
         return theta_errors, hessian_inv_errors
 
-    def run_multiple_datasets(
-        self, N: int = 100, n: int = 10_000, e_values: list = [1, 2], save=False
-    ):
+    def run_multiple_datasets(self, N: int = 100, n: int = 10_000, save=False):
         """
         Run the experiment multiple times by generating a new dataset and initial theta each time
         """
@@ -190,8 +170,7 @@ class Simulation:
         )
         data_pbar = tqdm(total=n, desc="Data", position=2, leave=False)
 
-        for e in e_values:
-            self.e = e
+        for e in self.e_values:
             self.theta_errors_avg = {
                 optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list
             }
@@ -206,7 +185,7 @@ class Simulation:
 
             for _ in range(N):
                 self.dataset = self.generate_dataset(n, self.true_theta)
-                self.generate_initial_theta()
+                self.generate_initial_theta(e=e)
                 theta_errors, hessian_inv_errors = self.run([optimizer_pbar, data_pbar])
 
                 for name, errors in theta_errors.items():
@@ -229,7 +208,7 @@ class Simulation:
         optimizer_pbar.close()
         runs_pbar.close()
 
-        self.plot_all_errors(all_theta_errors_avg, all_hessian_inv_errors_avg, N, plot=True)
+        self.plot_all_errors(all_theta_errors_avg, all_hessian_inv_errors_avg, N)
 
     def plot_errors(self, all_errors_avg: dict, error_type: str, ylabel: str, N: int):
         """
@@ -297,4 +276,20 @@ class Simulation:
         if self.true_hessian_inv is not None:
             self.plot_errors(
                 all_hessian_inv_errors, "", r"$\| H^{-1} - H^{-1*} \|_F$", N
+            )
+
+    @staticmethod
+    def highlight_max(data):
+        """
+        Highlight the maximum in a DataFrame or Series row with bold font
+        """
+        attr = "font-weight: bold"
+        if data.ndim == 1:  # Series from a DataFrame.apply(axis=1)
+            is_max = data == data.max()
+            return [attr if v else "" for v in is_max]
+        else:  # DataFrame direct styling
+            return pd.DataFrame(
+                np.where(data == data.max(axis=1)[:, None], attr, ""),
+                index=data.index,
+                columns=data.columns,
             )

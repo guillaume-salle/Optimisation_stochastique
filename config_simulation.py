@@ -31,12 +31,12 @@ bias_setting = True
 
 nu_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 gamma_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
-e_list = [1, 2]
+e_values = [1, 2]
 
 simulation_linear_regression = partial(
     Simulation,
     g=LinearRegression(bias=bias_setting),
-    e_list=e_list,
+    e_values=e_values,
     true_theta=true_theta,
     generate_dataset=partial(generate_linear_regression, bias=bias_setting),
 )
@@ -44,7 +44,7 @@ simulation_linear_regression = partial(
 simulation_logistic_regression = partial(
     Simulation,
     g=LogisticRegression(bias=bias_setting),
-    e_list=e_list,
+    e_values=e_values,
     true_theta=true_theta,
     generate_dataset=partial(generate_logistic_regression, bias=bias_setting),
 )
@@ -53,7 +53,7 @@ true_theta_geometric_median = np.zeros(10)
 simulation_geometric_median = partial(
     Simulation,
     g=GeometricMedian(),
-    e_list=e_list,
+    e_values=e_values,
     true_theta=true_theta_geometric_median,
     generate_dataset=partial(generate_geometric_median, cov="article"),
 )
@@ -65,7 +65,7 @@ true_theta_spherical_distribution = np.append(mu, r)
 simulation_spherical_distribution = partial(
     Simulation,
     g=SphericalDistribution(),
-    e_list=[0.5, 1],
+    e_values=[0.5, 1],
     true_theta=true_theta_spherical_distribution,
     generate_dataset=partial(generate_spherical_distribution, delta=delta),
 )
@@ -76,7 +76,7 @@ true_theta_p_means = np.zeros(d)
 simulation_p_means = partial(
     Simulation,
     g=pMeans(p=p),
-    e_list=e_list,
+    e_values=e_values,
     true_theta=true_theta_p_means,
     generate_dataset=partial(generate_p_means, cov="article"),
 )
@@ -86,7 +86,7 @@ eval_covtype = partial(
     Simulation,
     g=LogisticRegression(bias=True),
     true_theta=None,
-    e_list=None,
+    e_values=None,
     generate_dataset=None,
     dataset=train_covtype,
     test_dataset=test_covtype,
