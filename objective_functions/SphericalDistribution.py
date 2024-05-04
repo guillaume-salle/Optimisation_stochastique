@@ -9,8 +9,7 @@ class SphericalDistribution(BaseObjectiveFunction):
     Spherical distribution objective function
     """
 
-    def __init__(self, bias: bool = True):
-        self.bias = bias
+    def __init__(self):
         self.name = "Spherical Distribution"
 
     def __call__(self, X: Any, h: np.ndarray) -> np.ndarray:

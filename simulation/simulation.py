@@ -212,7 +212,7 @@ class Simulation:
 
     def plot_errors(self, all_errors_avg: dict, error_type: str, ylabel: str, N: int):
         """
-        Plot errors for each value of e in separate subplots.
+        Plot errors for each value of e in separate subplots, each with its own y-axis scale.
 
         Args:
         all_errors_avg (dict): Dictionary of errors averaged over runs, keyed by e values.
@@ -222,7 +222,7 @@ class Simulation:
         """
         num_e_values = len(all_errors_avg)
         fig, axes = plt.subplots(
-            1, num_e_values, figsize=(10 * num_e_values, 6), sharey=True
+            1, num_e_values, figsize=(10 * num_e_values, 6), sharey=False
         )
 
         if num_e_values == 1:
@@ -239,19 +239,19 @@ class Simulation:
                 ]
             )
 
-            min_error = float("inf")
             max_error = 0
 
             for (name, errors), mk, me in zip(
                 errors_dict.items(), markers_cycle, markevery_cycle
             ):
                 ax.plot(errors, label=name, marker=mk, markersize=10, markevery=me)
-                min_error = min(min_error, np.min(errors))
                 max_error = max(max_error, np.max(errors))
 
             ax.set_xscale("log")
             ax.set_yscale("log")
-            ax.set_ylim(top=min(max_error, 1e5))  # Setting the upper limit of y
+            ax.set_ylim(
+                top=min(max_error, 1e5)
+            )  # Optionally set a sensible upper limit
             ax.set_xlabel("Sample size")
             average = f" averaged over {N} run" + ("s" if N > 1 else "")
             ax.set_ylabel(ylabel + average)
