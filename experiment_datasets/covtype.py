@@ -7,6 +7,9 @@ from sklearn.model_selection import train_test_split
 
 
 def covtype() -> Tuple[Dataset, Dataset]:
+    """
+    Load the covtype dataset and split it into training and testing sets.
+    """
     dataset = fetch_covtype()
     X, y = dataset.data, dataset.target
     y_binary = np.where(y == 1, 1, 0)
@@ -15,5 +18,5 @@ def covtype() -> Tuple[Dataset, Dataset]:
     X_train, X_test, Y_train_binary, Y_test_binary = train_test_split(
         X, y_binary, test_size=0.2, random_state=42
     )
-
-    return Dataset(X=X_train, Y=Y_train_binary), Dataset(X=X_test, Y=Y_test_binary)
+    name = "covtype"
+    return Dataset(X_train, Y_train_binary, name), Dataset(X_test, Y_test_binary, name)

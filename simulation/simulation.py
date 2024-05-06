@@ -45,6 +45,9 @@ class Simulation:
         self.generate_dataset = generate_dataset
         self.true_theta = true_theta
         self.true_hessian_inv = true_hessian_inv
+        # If true values are not provided, set the logging function to None
+        if true_theta is None and true_hessian_inv is None:
+            self.logging_estimation_error = lambda *args: None
         self.initial_theta = initial_theta
         self.e_values = e_values
 
@@ -52,19 +55,25 @@ class Simulation:
         """
         Generate a random initial theta
         """
+        # Get the dimension of theta from the dataset
         if self.dataset is None:
             raise ValueError("dataset is not set")
         theta_dim = self.g.get_theta_dim(X=next(iter(self.dataset)))
+        # Check if the true theta has the same dimension
         if self.true_theta is not None and self.true_theta.shape[0] != theta_dim:
             raise ValueError(
                 f"true_theta dim ({self.true_theta.shape[0]}) does not match the dim of theta ({theta_dim}) for g"
             )
+        # Generate the initial theta
         loc = self.true_theta if self.true_theta is not None else np.zeros(theta_dim)
         self.initial_theta = loc + e * np.random.randn(theta_dim)
 
-    def log_estimation_error(
+    def logging_estimation_error(
         self, theta_errors: dict, hessian_inv_errors: dict, optimizer
     ):
+        """
+        Log the estimation error of theta and hessian inverse
+        """
         if self.true_theta is not None:
             theta_errors[optimizer.name].append(
                 np.dot(self.theta - self.true_theta, self.theta - self.true_theta)
@@ -94,6 +103,7 @@ class Simulation:
             if self.true_hessian_inv is not None
             else None
         )
+        # Store accuracies if test dataset is provided
         accuracies = {} if self.test_dataset is not None else None
 
         # tqdm with VScode bugs, have to initialize the bars outside and reset in the loop
@@ -115,13 +125,15 @@ class Simulation:
             self.theta = self.initial_theta.copy()
 
             # Log initial error
-            self.log_estimation_error(theta_errors, hessian_inv_errors, optimizer)
+            self.logging_estimation_error(theta_errors, hessian_inv_errors, optimizer)
 
             # Online pass on the dataset
             data_pbar.reset(total=len(self.dataset))
             for data in self.dataset:
                 optimizer.step(data, self.theta, self.g)
-                self.log_estimation_error(theta_errors, hessian_inv_errors, optimizer)
+                self.logging_estimation_error(
+                    theta_errors, hessian_inv_errors, optimizer
+                )
                 data_pbar.update(1)
             optimizer_pbar.update(1)
 
@@ -134,7 +146,7 @@ class Simulation:
                     "Test Accuracy": test_acc,
                 }
 
-            # Convert errors to numpy arrays
+            # Convert errors to numpy arrays for averaging
             if theta_errors is not None:
                 theta_errors[optimizer.name] = np.array(theta_errors[optimizer.name])
             if hessian_inv_errors is not None:
@@ -146,9 +158,11 @@ class Simulation:
             optimizer_pbar.close()
             data_pbar.close()
 
-        if accuracies is not None:
+        if self.test_dataset is not None:
             accuracies_df = pd.DataFrame(accuracies)
             styled_df = accuracies_df.style.apply(self.highlight_max, axis=1)
+            if hasattr(self.dataset, "name"):
+                styled_df.set_caption("Accuracy on " + self.dataset.name)
             display(styled_df)
 
         return theta_errors, hessian_inv_errors
@@ -210,13 +224,12 @@ class Simulation:
 
         self.plot_all_errors(all_theta_errors_avg, all_hessian_inv_errors_avg, N)
 
-    def plot_errors(self, all_errors_avg: dict, error_type: str, ylabel: str, N: int):
+    def plot_errors(self, all_errors_avg: dict, ylabel: str, N: int):
         """
         Plot errors for each value of e in separate subplots, each with its own y-axis scale.
 
         Args:
         all_errors_avg (dict): Dictionary of errors averaged over runs, keyed by e values.
-        error_type (str): Description of the error type for titling.
         ylabel (str): Label for the y-axis.
         N (int): Number of simulations each error average is based on.
         """
@@ -255,7 +268,7 @@ class Simulation:
             ax.set_xlabel("Sample size")
             average = f" averaged over {N} run" + ("s" if N > 1 else "")
             ax.set_ylabel(ylabel + average)
-            ax.set_title(f"{error_type} e={e}")
+            ax.set_title(f"e={e}")
             ax.legend(loc="lower left")
 
         plt.suptitle(self.g.name)
@@ -272,11 +285,11 @@ class Simulation:
         clear_output(wait=True)
 
         if self.true_theta is not None:
-            self.plot_errors(all_theta_errors, "", r"$\| \theta - \theta^* \|^2$", N)
+            ylabel = r"$\| \theta - \theta^* \|^2$"
+            self.plot_errors(all_theta_errors, ylabel, N)
         if self.true_hessian_inv is not None:
-            self.plot_errors(
-                all_hessian_inv_errors, "", r"$\| H^{-1} - H^{-1*} \|_F$", N
-            )
+            ylabel = r"$\| H^{-1} - H^{-1*} \|_F$"
+            self.plot_errors(all_hessian_inv_errors, ylabel, N)
 
     @staticmethod
     def highlight_max(data):

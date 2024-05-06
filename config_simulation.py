@@ -92,3 +92,19 @@ eval_covtype = partial(
     initial_theta=np.zeros(54 + 1),
     e_values=None,
 )
+
+simulations = [
+    simulation_linear_regression,
+    simulation_logistic_regression,
+    simulation_geometric_median,
+    simulation_spherical_distribution,
+    simulation_p_means,
+]
+
+simulations_with_riccati = [
+    simulation_linear_regression,
+    simulation_logistic_regression,
+    simulation_geometric_median,
+]
+
+evaluations = [eval_covtype]

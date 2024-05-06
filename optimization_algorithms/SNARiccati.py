@@ -17,7 +17,7 @@ class SNARiccati(BaseOptimizer):
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
     ):
-        self.name = "SNA-Riccati" + f" ν={nu}"
+        self.name = "SNARiccati" + f" ν={nu}"
         self.nu = nu
         self.c_nu = c_nu
         self.add_iter_lr = add_iter_lr

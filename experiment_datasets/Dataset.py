@@ -2,16 +2,19 @@ import numpy as np
 
 
 class Dataset:
-    def __init__(self, X, Y=None):
+    def __init__(self, X, Y=None, name=None):
         """
         Initialize the dataset.
 
         Parameters:
         X (np.ndarray): Features of the dataset.
         Y (np.ndarray, optional): Labels of the dataset. If None, the dataset consists only of features.
+        name (str, optional): Name of the dataset.
         """
         self.X = X
         self.Y = Y
+        if name is not None:
+            self.name = name
 
     def __iter__(self):
         """
