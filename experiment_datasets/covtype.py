@@ -1,7 +1,7 @@
 from sklearn.datasets import fetch_covtype
 import numpy as np
 from typing import Tuple
-from datasets import Dataset
+from experiment_datasets import Dataset
 
 from sklearn.model_selection import train_test_split
 

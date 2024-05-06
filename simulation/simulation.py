@@ -9,7 +9,7 @@ from itertools import cycle
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
-from datasets import Dataset
+from experiment_datasets import Dataset
 
 
 class Simulation:

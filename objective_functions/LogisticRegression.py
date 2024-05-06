@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple
 
 from objective_functions import BaseObjectiveFunction
-from datasets import Dataset
+from experiment_datasets import Dataset
 
 
 def sigmoid(z: float):

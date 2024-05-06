@@ -1,6 +1,6 @@
 import numpy as np
 from typing import List, Tuple
-from datasets import Dataset
+from experiment_datasets import Dataset
 
 
 def sigmoid_array(z: np.ndarray) -> np.ndarray:
