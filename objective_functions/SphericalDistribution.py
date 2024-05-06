@@ -56,13 +56,25 @@ class SphericalDistribution(BaseObjectiveFunction):
             return np.array([0, b]), None
         else:
             grad = np.concatenate([a - X + b * (X - a) / norm, np.array([b - norm])])
-            eye_part = (1 - b / norm) * np.eye(len(a)) + (b / norm**3) * np.outer(
-                X - a, X - a
-            )
-            vector_part = (X - a)[:, np.newaxis] / norm
-            scalar_part = np.array([[1]])
-            top_right = vector_part
-            bottom_left = vector_part.T
+            # eye_part = (1 - b / norm) * np.eye(len(a)) + (b / norm**3) * np.outer(
+            #     X - a, X - a
+            # )
+            # matrix = (X-a) @ (X-a).T
+            # assert matrix.shape == (len(a), len(a))
+            # eye_part = (1 - b / norm) * np.eye(len(a)) + (b / norm**3) * matrix
+            # vector_part = (X - a)[:, np.newaxis] / norm
+            # scalar_part = np.array([[1]])
+            # top_right = vector_part
+            # bottom_left = vector_part.T
 
-            hessian = np.block([[eye_part, top_right], [bottom_left, scalar_part]])
+            # hessian = np.block([[eye_part, top_right], [bottom_left, scalar_part]])
+            # return grad, hessian
+
+            hessian = np.zeros((len(a) + 1, len(a) + 1))
+            matrix = np.outer(X - a, X - a)
+            assert matrix.shape == (len(a), len(a))
+            hessian[:-1, :-1] = (1 - b / norm) * np.eye(len(a)) + b / norm**3 * matrix
+            hessian[-1, :-1] = (X - a) / norm
+            hessian[:-1, -1] = (X - a) / norm
+            hessian[-1, -1] = 1
             return grad, hessian

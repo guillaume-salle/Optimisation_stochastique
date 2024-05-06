@@ -29,3 +29,6 @@ class Dataset:
         Return the number of samples in the dataset.
         """
         return len(self.X)
+
+
+# usna streaming: essayer c_nu = d**0.5, d**2/3 et d

@@ -12,7 +12,7 @@ class WASNARiccati(BaseOptimizer):
 
     def __init__(
         self,
-        nu: float,
+        nu: float = 0.66,
         c_nu: float = 1.0,
         tau_theta: float = 2.0,
         add_iter_lr: int = 20,

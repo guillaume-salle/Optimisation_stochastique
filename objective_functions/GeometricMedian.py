@@ -56,4 +56,6 @@ class GeometricMedian(BaseObjectiveFunction):
         Z = np.random.randn(h.shape[0])
         alpha = 1 / (iter * np.log(iter + 1))
         riccati = self.grad(X, h + alpha * Z) - grad
+        norm = np.linalg.norm(X - h)
+        riccati = riccati * np.sqrt(norm) / alpha  # ???
         return grad, riccati
