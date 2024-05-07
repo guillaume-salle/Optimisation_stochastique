@@ -1,22 +1,34 @@
 from sklearn.datasets import fetch_covtype
 import numpy as np
 from typing import Tuple
-from experiment_datasets import Dataset
+import torch
+from torch.utils.data import TensorDataset, random_split
 
-from sklearn.model_selection import train_test_split
 
-
-def covtype() -> Tuple[Dataset, Dataset]:
+def covtype(test_size: float = 0.2) -> Tuple[TensorDataset, TensorDataset]:
     """
-    Load the covtype dataset and split it into training and testing sets.
+    Load the covtype dataset and split it into training and testing sets as PyTorch TensorDatasets.
+
+    Args:
+    test_size (float): The proportion of the dataset to include in the test split.
+
+    Returns:
+    Tuple[TensorDataset, TensorDataset]: Returns a tuple containing the training and testing datasets.
     """
+    # Fetch the dataset from sklearn
     dataset = fetch_covtype()
     X, y = dataset.data, dataset.target
-    y_binary = np.where(y == 1, 1, 0)
+    y_binary = np.where(y == 1, 1, 0)  # Convert to binary classification
 
-    # Split the data into training and testing sets
-    X_train, X_test, Y_train_binary, Y_test_binary = train_test_split(
-        X, y_binary, test_size=0.2, random_state=42
-    )
-    name = "covtype"
-    return Dataset(X_train, Y_train_binary, name), Dataset(X_test, Y_test_binary, name)
+    # Convert numpy arrays to PyTorch tensors
+    X_tensor = torch.tensor(X, dtype=torch.float32)
+    Y_tensor = torch.tensor(y_binary, dtype=torch.long)
+
+    # Create a TensorDataset
+    full_dataset = TensorDataset(X_tensor, Y_tensor)
+
+    # Split the dataset into training and testing sets
+    train_size = 1 - test_size
+    train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
+
+    return train_dataset, test_dataset

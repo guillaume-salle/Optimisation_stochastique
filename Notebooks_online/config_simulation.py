@@ -17,8 +17,11 @@ from experiment_datasets import (
     covtype,
 )
 
+# usna streaming: essayer c_nu = d**0.5, d**2/3 et d  TODO
+
+
 # Configuration for the number of runs and size of data
-N = 20
+N = 10
 n = int(1e4)
 
 # Configuration for true theta
