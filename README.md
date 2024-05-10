@@ -1,1 +1,1 @@
-# M2A_Projet_Opti_Newton
+# Newton optimisation algorithms

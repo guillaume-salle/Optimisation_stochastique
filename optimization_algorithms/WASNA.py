@@ -1,5 +1,5 @@
-import numpy as np
-from typing import Any
+import torch
+from typing import Tuple
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -17,6 +17,7 @@ class WASNA(BaseOptimizer):
         tau_theta: float = 2.0,
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix
+        device: str = None,
     ):
         self.name = (
             ("WASNA" if tau_theta != 0.0 else "SNA*")
@@ -28,22 +29,25 @@ class WASNA(BaseOptimizer):
         self.tau_theta = tau_theta
         self.add_iter_lr = add_iter_lr
         self.lambda_ = lambda_
+        self.device = device
+        if device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def reset(self, initial_theta: np.ndarray):
+    def reset(self, initial_theta: torch.Tensor):
         """
         Reset the learning rate and estimate of the hessian
         """
         self.iter = 0
-        self.theta_dim = initial_theta.shape[0]
-        self.theta_not_avg = np.copy(initial_theta)
+        self.theta_dim = initial_theta.size(0)
+        self.theta_not_avg = initial_theta.detach().clone().to(self.device)
         self.sum_weights_theta = 0
         # Weight more the initial identity matrix
-        self.hessian_bar = self.lambda_ * self.theta_dim * np.eye(self.theta_dim)
+        self.hessian_bar = self.lambda_ * self.theta_dim * torch.eye(self.theta_dim)
 
     def step(
         self,
-        data: Any,
-        theta: np.ndarray,
+        data: Tuple | torch.Tensor,
+        theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ):
         """
@@ -54,13 +58,9 @@ class WASNA(BaseOptimizer):
 
         # Update the hessian estimate
         self.hessian_bar += hessian
-        try:
-            hessian_inv = np.linalg.inv(
-                self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
-            )
-        except np.linalg.LinAlgError:
-            # Hessian is not invertible
-            hessian_inv = np.eye(self.theta_dim)
+        hessian_inv = torch.inverse(
+            self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
+        )
 
         # Update the theta estimate
         learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)

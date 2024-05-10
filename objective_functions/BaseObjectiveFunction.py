@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
-import numpy as np
-from typing import Tuple, Any
+from typing import Tuple
+import torch
 
 
 class BaseObjectiveFunction(ABC):
@@ -9,24 +9,26 @@ class BaseObjectiveFunction(ABC):
     """
 
     @abstractmethod
-    def __call__(self, X: Any, h: np.ndarray) -> np.ndarray:
+    def __call__(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
 
     @abstractmethod
-    def get_theta_dim(self, X: Any) -> int:
+    def get_theta_dim(self, data: Tuple) -> int:
         raise NotImplementedError
 
     @abstractmethod
-    def grad(self, X: Any, h: np.ndarray) -> np.ndarray:
+    def grad(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
 
     @abstractmethod
-    def grad_and_hessian(self, X: Any, h: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def grad_and_hessian(
+        self, data: Tuple, h: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError
 
     def grad_and_riccati(
-        self, X: Any, h: np.ndarray, iter: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, data: Tuple, h: torch.Tensor, iter: int
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         raise NotImplementedError(
             "Riccati is not implemented for this objective function"
         )

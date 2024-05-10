@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 from typing import Any
 
 from optimization_algorithms import BaseOptimizer
@@ -23,18 +23,18 @@ class SNA(BaseOptimizer):
         self.add_iter_lr = add_iter_lr
         self.lambda_ = lambda_
 
-    def reset(self, initial_theta: np.ndarray):
+    def reset(self, initial_theta: torch.Tensor):
         """
         Reset the learning rate and estimate of the hessian
         """
         self.iter = 0
-        self.theta_dim = initial_theta.shape[0]
-        self.hessian_bar = self.lambda_ * self.theta_dim * np.eye(self.theta_dim)
+        self.theta_dim = initial_theta.size(0)
+        self.hessian_bar = self.lambda_ * self.theta_dim * torch.eye(self.theta_dim)
 
     def step(
         self,
         data: Any,
-        theta: np.ndarray,
+        theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ):
         """
@@ -44,11 +44,11 @@ class SNA(BaseOptimizer):
         grad, hessian = g.grad_and_hessian(data, theta)
         self.hessian_bar += hessian
         try:
-            hessian_inv = np.linalg.inv(
+            hessian_inv = torch.inverse(
                 self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
             )
-        except np.linalg.LinAlgError:
+        except RuntimeError:
             # Hessian is not invertible
-            hessian_inv = np.eye(self.theta_dim)
+            hessian_inv = torch.eye(self.theta_dim)
         learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         theta += -learning_rate * hessian_inv @ grad

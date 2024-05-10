@@ -1,4 +1,3 @@
-import numpy as np
 from typing import Any
 from abc import ABC, abstractmethod
 
@@ -24,7 +23,7 @@ class BaseOptimizer(ABC):
     def step(
         self,
         data: Any,
-        thea_estimate: np.ndarray,
+        theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ) -> None:
         """

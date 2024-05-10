@@ -1,7 +1,7 @@
-import numpy as np
+import torch
 from typing import Any, Tuple
 
-from objective_functions import BaseObjectiveFunction
+from objective_functions import BaseObjectiveFunction, add_bias
 
 
 class LinearRegression(BaseObjectiveFunction):
@@ -13,66 +13,83 @@ class LinearRegression(BaseObjectiveFunction):
         self.bias = bias
         self.name = "Linear model"
 
-    def __call__(self, X: Any, theta: np.ndarray) -> np.ndarray:
+    def __call__(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
         """
         Compute the linear regression loss, works with a batch or a single data point
         """
-        x, y = X
-        x = np.atleast_2d(x)
-        phi = np.hstack([np.ones((x.shape[0], 1)), x]) if self.bias else x
-        Y_pred = np.dot(phi, theta)
+        X, y = data
+        X = torch.atleast_2d(X)
+        if self.bias:
+            X = add_bias(X)
+        Y_pred = torch.matmul(X, h)
         error = Y_pred - y
-        return 0.5 * np.dot(error, error)
+        return 0.5 * error**2
 
-    def get_theta_dim(self, X: Any) -> int:
+    def get_theta_dim(self, data: Tuple) -> int:
         """
         Return the dimension of theta
         """
-        x, _ = X
-        return x.shape[-1] + 1 if self.bias else x.shape[-1]
+        X, _ = data
+        return X.size(-1) + 1 if self.bias else X.size(-1)
 
-    def grad(self, X: Any, theta: np.ndarray) -> np.ndarray:
+    def grad(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
         """
-        Compute the gradient of the linear regression loss, works only for a single data point
+        Compute the gradient of the linear regression loss,
+        sum over the batch and normalize by the batch size
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        Y_pred = np.dot(phi, theta)
+        X, y = data
+        n = X.size(0)
+        if self.bias:
+            X = add_bias(X)
+        Y_pred = torch.dot(X, h)
         error = Y_pred - y
-        return error * phi
+        grad = torch.einsum("i,ij->j", error, X) / n
+        return grad
 
-    def hessian(self, X: Any, theta: np.ndarray) -> np.ndarray:
+    def hessian(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
         """
-        Compute the Hessian of the linear regression loss, works only for a single data point
+        Compute the Hessian of the linear regression loss,
+        sum over the batch and normalize by the batch size
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        return np.outer(phi, phi)
+        X, _ = data
+        n = X.size(0)
+        if self.bias:
+            X = add_bias(X)
+        hessian = torch.einsum("ij,ik->jk", X, X) / n
+        return hessian
 
     def grad_and_hessian(
-        self, X: Any, theta: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, data: Tuple, h: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Compute the gradient and the Hessian of the linear regression loss, works only for a single data point
+        Compute the gradient and the Hessian of the linear regression loss,
+        sum over the batch and normalize by the batch size
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        Y_pred = np.dot(phi, theta)
+        X, y = data
+        n = X.size(0)
+        if self.bias:
+            X = add_bias(X)
+        Y_pred = torch.dot(X, h)
         error = Y_pred - y
-        grad = error * phi
-        hessian = np.outer(phi, phi)
+        grad = torch.einsum("i,ij->j", error, X) / n
+        hessian = torch.einsum("ij,ik->jk", X, X) / n
         return grad, hessian
 
     def grad_and_riccati(
-        self, X: Any, theta: np.ndarray, iter: int = None
-    ) -> Tuple[np.ndarray, np.ndarray]:
+        self, data: Tuple, h: torch.Tensor, iter: int = None
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Compute the gradient and the Riccati of the linear regression loss, works only for a single data point
+        Compute the gradient and the Riccati of the linear regression loss
+        works only with a batch of size 1
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        Y_pred = np.dot(phi, theta)
+        X, y = data
+        n = X.size(0)
+        if n != 1:
+            raise ValueError("The Riccati term is only defined for a single data point")
+        if self.bias:
+            X = add_bias(X)
+        Y_pred = torch.dot(X, h)
         error = Y_pred - y
-        grad = error * phi
-        riccati = phi
+        grad = error * X
+        riccati = X
         return grad, riccati

@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import TensorDataset, random_split
 
 
-def covtype(test_size: float = 0.2) -> Tuple[TensorDataset, TensorDataset]:
+def covtype(test_size: float = 0.2) -> Tuple[TensorDataset, TensorDataset, str]:
     """
     Load the covtype dataset and split it into training and testing sets as PyTorch TensorDatasets.
 
@@ -13,8 +13,10 @@ def covtype(test_size: float = 0.2) -> Tuple[TensorDataset, TensorDataset]:
     test_size (float): The proportion of the dataset to include in the test split.
 
     Returns:
-    Tuple[TensorDataset, TensorDataset]: Returns a tuple containing the training and testing datasets.
+    Returns a tuple containing the training and testing datasets and the name of the dataset.
     """
+    name = "covtype"
+
     # Fetch the dataset from sklearn
     dataset = fetch_covtype()
     X, y = dataset.data, dataset.target
@@ -31,4 +33,4 @@ def covtype(test_size: float = 0.2) -> Tuple[TensorDataset, TensorDataset]:
     train_size = 1 - test_size
     train_dataset, test_dataset = random_split(full_dataset, [train_size, test_size])
 
-    return train_dataset, test_dataset
+    return train_dataset, test_dataset, name

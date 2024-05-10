@@ -1,5 +1,5 @@
-import numpy as np
-from typing import Any
+import torch
+from typing import Tuple
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -18,6 +18,7 @@ class USNA(BaseOptimizer):
         c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
         generate_Z: str = "normal",
         add_iter_lr: int = 20,
+        device: str = None,
     ):
         self.name = (
             "USNA"
@@ -42,17 +43,26 @@ class USNA(BaseOptimizer):
                 "Invalid value for Z. Choose 'normal', 'canonic' or 'canonic deterministic'."
             )
 
-    def reset(self, initial_theta: np.ndarray):
+        self.device = device
+        if device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    def reset(self, initial_theta: torch.Tensor):
         """
         Reset the learning rate and estimate of the hessian
         """
         self.iter = 0
-        self.theta_dim = initial_theta.shape[0]
-        self.hessian_inv = np.eye(self.theta_dim)
+        self.theta_dim = initial_theta.size(0)
+        self.hessian_inv = torch.eye(self.theta_dim, device=self.device)
         if self.generate_Z == "canonic deterministic":
             self.k = 0
 
-    def step(self, data: Any, theta: np.ndarray, g: BaseObjectiveFunction):
+    def step(
+        self,
+        data: Tuple[torch.Tensor, torch.Tensor] | torch.Tensor,
+        theta: torch.Tensor,
+        g: BaseObjectiveFunction,
+    ):
         """
         Perform one optimization step
         """
@@ -64,29 +74,29 @@ class USNA(BaseOptimizer):
         learning_rate_theta = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         theta += -learning_rate_theta * self.hessian_inv @ grad
 
-    def update_hessian_normal(self, hessian: np.ndarray):
+    def update_hessian_normal(self, hessian: torch.Tensor):
         """
         Update the hessian estimate with a normal random vector
         """
-        Z = np.random.randn(self.theta_dim)
+        Z = torch.randn(self.theta_dim, device=self.device)
         P = self.hessian_inv @ Z
         Q = hessian @ Z
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (
             -self.gamma
         )
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
-            product = np.outer(P, Q)
+        if torch.dot(Q, Q) * torch.dot(Z, Z) <= beta**2:
+            product = torch.outer(P, Q)
             self.hessian_inv += -learning_rate_hessian * (
-                product + product.transpose() - 2 * np.eye(self.theta_dim)
+                product + product.t() - 2 * torch.eye(self.theta_dim)
             )
 
-    def update_hessian_canonic(self, hessian: np.ndarray):
+    def update_hessian_canonic(self, hessian: torch.Tensor):
         """
         Update the hessian estimate with a canonic random vector
         """
         if self.generate_Z == "canonic":
-            z = np.random.randint(0, self.theta_dim)
+            z = torch.randint(0, self.theta_dim)
         elif self.generate_Z == "canonic deterministic":
             z = self.k
             self.k += 1
@@ -102,8 +112,8 @@ class USNA(BaseOptimizer):
             -self.gamma
         )
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * self.theta_dim <= beta**2:
-            product = self.theta_dim * np.outer(P, Q)
+        if torch.dot(Q, Q) * self.theta_dim <= beta**2:
+            product = self.theta_dim * torch.outer(P, Q)
             self.hessian_inv += -learning_rate_hessian * (
-                product + product.transpose() - 2 * np.eye(self.theta_dim)
+                product + product.t() - 2 * torch.eye(self.theta_dim)
             )

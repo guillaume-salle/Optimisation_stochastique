@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 from typing import Any
 
 from optimization_algorithms import BaseOptimizer
@@ -17,7 +17,7 @@ class SGD(BaseOptimizer):
         self.c_nu = c_nu
         self.add_iter_lr = add_iter_lr  # Dont start at 0 to avoid large learning rates at the beginning
 
-    def reset(self, initial_theta: np.ndarray):
+    def reset(self, initial_theta: torch.Tensor):
         """
         Reset the optimizer state
         """
@@ -26,13 +26,13 @@ class SGD(BaseOptimizer):
     def step(
         self,
         data: Any,
-        theta_estimate: np.ndarray,
+        theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ):
         """
         Perform one optimization step
         """
         self.iter += 1
-        grad = g.grad(data, theta_estimate)
+        grad = g.grad(data, theta)
         learning_rate = self.c_nu * ((self.iter + self.add_iter_lr) ** (-self.nu))
-        theta_estimate += -learning_rate * grad
+        theta += -learning_rate * grad

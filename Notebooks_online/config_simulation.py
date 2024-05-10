@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 from functools import partial
 from objective_functions import (
     LinearRegression,
@@ -24,10 +24,14 @@ from experiment_datasets import (
 N = 10
 n = int(1e4)
 
+batch_size = 1  # Online setting
+
 # Configuration for true theta
-true_theta = np.array([0, 3, -9, 4, -9, 15, 0, -7, 1, 0])  # Article, set bias=True
-# true_theta = np.array([-2., -1., 0., 1., 2.])            # Slides, bias=False
-# true_theta = np.array([1, 1, 1, 1, 1])                   # Poly, bias=False
+true_theta = torch.tensor(
+    [0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0]
+)  # Article, set bias=True
+# true_theta = torch.tensor([-2., -1., 0., 1., 2.])            # Slides, bias=False
+# true_theta = torch.tensor([1, 1, 1, 1, 1])                   # Poly, bias=False
 
 # Whether or not a bias term is included
 bias_setting = True
@@ -52,7 +56,7 @@ simulation_logistic_regression = partial(
     e_values=e_values,
 )
 
-true_theta_geometric_median = np.zeros(10)
+true_theta_geometric_median = torch.zeros(10)
 simulation_geometric_median = partial(
     Simulation,
     g=GeometricMedian(),
@@ -61,10 +65,10 @@ simulation_geometric_median = partial(
     e_values=e_values,
 )
 
-mu = np.zeros(3)
+mu = torch.zeros(3)
 r = 2.0
 delta = 0.2
-true_theta_spherical_distribution = np.append(mu, r)
+true_theta_spherical_distribution = torch.cat((mu, torch.tensor([r])))
 simulation_spherical_distribution = partial(
     Simulation,
     g=SphericalDistribution(),
@@ -75,7 +79,7 @@ simulation_spherical_distribution = partial(
 
 d = 40
 p = 1.5
-true_theta_p_means = np.zeros(d)
+true_theta_p_means = torch.zeros(d)
 simulation_p_means = partial(
     Simulation,
     g=pMeans(p=p),
@@ -84,7 +88,7 @@ simulation_p_means = partial(
     e_values=e_values,
 )
 
-train_covtype, test_covtype = covtype()
+train_covtype, test_covtype, name = covtype()
 eval_covtype = partial(
     Simulation,
     g=LogisticRegression(bias=True),
@@ -92,7 +96,8 @@ eval_covtype = partial(
     generate_dataset=None,
     dataset=train_covtype,
     test_dataset=test_covtype,
-    initial_theta=np.zeros(54 + 1),
+    dataset_name=name,
+    initial_theta=torch.zeros(54 + 1),
     e_values=None,
 )
 

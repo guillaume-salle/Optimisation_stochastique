@@ -1,4 +1,4 @@
-import numpy as np
+import torch
 from typing import Any, Tuple
 
 from objective_functions import BaseObjectiveFunction
@@ -12,40 +12,62 @@ class pMeans(BaseObjectiveFunction):
     def __init__(self, p: float = 1.5):
         self.name = "p-means"
         self.p = p
+        self.atol = 1e-6
 
-    def __call__(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
-        return (np.linalg.norm(X - h) ** self.p) / self.p
+    def __call__(self, X: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
+        return (torch.norm(X - h, dim=1) ** self.p) / self.p
 
-    def get_theta_dim(self, X: np.ndarray) -> int:
+    def get_theta_dim(self, X: torch.Tensor) -> int:
         """
         Return the dimension of theta
         """
-        return X.shape[-1]
+        return X.size(-1)
 
-    def grad(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
-        return -(X - h) * np.linalg.norm(X - h) ** (self.p - 2)
+    def grad(self, X: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the gradient of the objective function, average over the batch
+        """
+        n = X.size(0)
+        diff = h - X
+        return (torch.norm(diff, dim=1) ** (self.p - 2)) * diff / n
 
-    def hessian(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
-        epsilon = 1e-8
-        diff = X - h
-        norm = np.linalg.norm(diff)
-        if np.isclose(norm, 0, atol=epsilon):
-            return np.zeros((h.shape[0], h.shape[0]))
-        else:
-            return norm ** (self.p - 2) * (
-                np.eye(h.shape[0]) - (2 - self.p) * np.outer(diff, diff) / norm**2
-            )
+    def hessian(self, X: torch.Tensor, h: torch.Tensor) -> torch.Tensor:
+        """
+        Compute the Hessian of the objective function, returns Id if h is close to X,
+        average over the batch
+        """
+        n, d = X.size()
+        diff = h - X
+        norm = torch.norm(diff, dim=1)
+        safe_inv_norm = torch.where(
+            torch.isclose(norm, torch.zeros_like(norm), atol=self.atol),
+            torch.ones_like(norm),
+            1 / norm,
+        )
+        # Divide by n here to have d+n operations instead of d^2
+        hessian = torch.eye(d) * torch.mean(norm ** (self.p - 2)) - (
+            2 - self.p
+        ) * torch.einsum("n,ni,nj->ij", (safe_inv_norm**2) / n, diff, diff)
+        return hessian
 
     def grad_and_hessian(
-        self, X: np.ndarray, h: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        epsilon = 1e-8
-        diff = X - h
-        norm = np.linalg.norm(diff)
-        if np.isclose(norm, 0, atol=epsilon):
-            return np.zeros_like(h), np.zeros((h.shape[0], h.shape[0]))
-        grad = -diff * norm ** (self.p - 2)
-        hessian = norm ** (self.p - 2) * (
-            np.eye(h.shape[0]) - (2 - self.p) * np.outer(diff, diff) / norm**2
+        self, X: torch.Tensor, h: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Compute the gradient and Hessian of the objective function, returns Id if h is close to X,
+        average over the batch
+        """
+        n, d = X.size()
+        diff = h - X
+        norm = torch.norm(diff, dim=1)
+        safe_inv_norm = torch.where(
+            torch.isclose(norm, torch.zeros_like(norm), atol=self.atol),
+            torch.ones_like(norm),
+            1 / norm,
         )
+        grad = (norm ** (self.p - 2)) * diff / n
+        # Divide by n here to have d+n operations instead of d^2
+        hessian = torch.eye(d) * torch.mean(norm ** (self.p - 2)) - (
+            2 - self.p
+        ) * torch.einsum("n,ni,nj->ij", (safe_inv_norm**2) / n, diff, diff)
         return grad, hessian

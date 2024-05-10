@@ -1,13 +1,16 @@
+from typing import Tuple
 import torch
 from torch.utils.data import TensorDataset
 
 
 def generate_spherical_distribution(
     n: int, true_theta: torch.Tensor, delta: float = 0.2  # Same value as in article
-) -> TensorDataset:
+) -> Tuple[TensorDataset, str]:
     """
     Generate spherical distribution data
     """
+    name = "spherical distribution"
+
     mu = true_theta[:-1].copy()
     r = true_theta[-1]
 
@@ -20,4 +23,4 @@ def generate_spherical_distribution(
 
     X = mu + r * U * W.unsqueeze(1)
 
-    return TensorDataset(X)
+    return TensorDataset(X), name

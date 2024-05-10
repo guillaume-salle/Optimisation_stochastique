@@ -7,9 +7,11 @@ from tqdm.auto import tqdm
 from IPython.display import clear_output
 from itertools import cycle
 
+import torch
+from torch.utils.data import Dataset, DataLoader
+
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
-from experiment_datasets import Dataset
 
 
 class Simulation:
@@ -25,10 +27,12 @@ class Simulation:
         dataset: Dataset = None,
         test_dataset: Dataset = None,
         generate_dataset: Callable = None,
-        true_theta: np.ndarray = None,
-        true_hessian_inv: np.ndarray = None,
-        initial_theta: np.ndarray = None,
+        dataset_name: str = None,
+        true_theta: torch.Tensor = None,
+        true_hessian_inv: torch.Tensor = None,
+        initial_theta: torch.Tensor = None,
         e_values: List[float] = [1.0, 2.0],
+        device: str = None,
     ):
         """
         Initialize the experiment
@@ -43,6 +47,7 @@ class Simulation:
         self.dataset = dataset
         self.test_dataset = test_dataset
         self.generate_dataset = generate_dataset
+        self.dataset_name = dataset_name
         self.true_theta = true_theta
         self.true_hessian_inv = true_hessian_inv
         # If true values are not provided, set the logging function to None
@@ -50,6 +55,10 @@ class Simulation:
             self.logging_estimation_error = lambda *args: None
         self.initial_theta = initial_theta
         self.e_values = e_values
+        if device is not None:
+            self.device = torch.device(device)
+        else:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     def generate_initial_theta(self, e: float = 1.0):
         """
@@ -58,15 +67,15 @@ class Simulation:
         # Get the dimension of theta from the dataset
         if self.dataset is None:
             raise ValueError("dataset is not set")
-        theta_dim = self.g.get_theta_dim(X=next(iter(self.dataset)))
+        theta_dim = self.g.get_theta_dim(data=next(iter(self.dataset)))
         # Check if the true theta has the same dimension
         if self.true_theta is not None and self.true_theta.shape[0] != theta_dim:
             raise ValueError(
-                f"true_theta dim ({self.true_theta.shape[0]}) does not match the dim of theta ({theta_dim}) for g"
+                f"true_theta dim ({self.true_theta.size(0)}) does not match the dim of theta ({theta_dim}) for g"
             )
         # Generate the initial theta
-        loc = self.true_theta if self.true_theta is not None else np.zeros(theta_dim)
-        self.initial_theta = loc + e * np.random.randn(theta_dim)
+        loc = self.true_theta if self.true_theta is not None else torch.zeros(theta_dim)
+        self.initial_theta = loc + e * torch.randn(theta_dim)
 
     def logging_estimation_error(
         self, theta_errors: dict, hessian_inv_errors: dict, optimizer
@@ -75,15 +84,18 @@ class Simulation:
         Log the estimation error of theta and hessian inverse
         """
         if self.true_theta is not None:
-            theta_errors[optimizer.name].append(
-                np.dot(self.theta - self.true_theta, self.theta - self.true_theta)
-            )
+            diff = self.theta - self.true_theta
+            theta_errors[optimizer.name].append(torch.dot(diff, diff).item())
         if self.true_hessian_inv is not None and optimizer.hessian_inv is not None:
             hessian_inv_errors[optimizer.name].append(
-                np.linalg.norm(optimizer.hessian_inv - self.true_hessian_inv, ord="fro")
+                torch.norm(
+                    optimizer.hessian_inv - self.true_hessian_inv, p="fro"
+                ).item()
             )
 
-    def run(self, pbars: Tuple[tqdm, tqdm] = None) -> Tuple[List[float], List[float]]:
+    def run(
+        self, batch_size: int, pbars: Tuple[tqdm, tqdm] = None
+    ) -> Tuple[List[float], List[float]]:
         """
         Run the experiment for a given initial theta, a dataset and a list of optimizers
         """
@@ -122,14 +134,15 @@ class Simulation:
         for optimizer in self.optimizer_list:
             optimizer.reset(self.initial_theta)
             optimizer_pbar.set_description(optimizer.name)
-            self.theta = self.initial_theta.copy()
+            self.theta = self.initial_theta.detach().clone().to(self.device)
 
             # Log initial error
             self.logging_estimation_error(theta_errors, hessian_inv_errors, optimizer)
 
             # Online pass on the dataset
             data_pbar.reset(total=len(self.dataset))
-            for data in self.dataset:
+            data_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
+            for data in data_loader:
                 optimizer.step(data, self.theta, self.g)
                 self.logging_estimation_error(
                     theta_errors, hessian_inv_errors, optimizer
@@ -139,8 +152,12 @@ class Simulation:
 
             # Calculate and store accuracies if test dataset is provided
             if self.test_dataset is not None:
-                train_acc = self.g.evaluate_accuracy(self.dataset, self.theta)
-                test_acc = self.g.evaluate_accuracy(self.test_dataset, self.theta)
+                train_acc = 100 * round(
+                    self.g.evaluate_accuracy(self.dataset, self.theta), 2
+                )
+                test_acc = 100 * round(
+                    self.g.evaluate_accuracy(self.test_dataset, self.theta), 2
+                )
                 accuracies[optimizer.name] = {
                     "Training Accuracy": train_acc,
                     "Test Accuracy": test_acc,
@@ -161,13 +178,13 @@ class Simulation:
         if self.test_dataset is not None:
             accuracies_df = pd.DataFrame(accuracies)
             styled_df = accuracies_df.style.apply(self.highlight_max, axis=1)
-            if hasattr(self.dataset, "name"):
-                styled_df.set_caption("Accuracy on " + self.dataset.name)
+            if self.dataset is not None:
+                styled_df.set_caption("Accuracy on " + self.dataset_name)
             display(styled_df)
 
         return theta_errors, hessian_inv_errors
 
-    def run_multiple_datasets(self, N: int = 100, n: int = 10_000, save=False):
+    def run_multiple_datasets(self, N: int = 100, n: int = 10_000, batch_size: int = 1):
         """
         Run the experiment multiple times by generating a new dataset and initial theta each time
         """
@@ -186,10 +203,13 @@ class Simulation:
 
         for e in self.e_values:
             self.theta_errors_avg = {
-                optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list
+                optimizer.name: torch.zeros(n + 1) for optimizer in self.optimizer_list
             }
             self.hessian_inv_errors_avg = (
-                {optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list}
+                {
+                    optimizer.name: torch.zeros(n + 1)
+                    for optimizer in self.optimizer_list
+                }
                 if self.true_hessian_inv is not None
                 else None
             )
@@ -198,9 +218,13 @@ class Simulation:
             runs_pbar.set_description(f"Runs for e={e}")
 
             for _ in range(N):
-                self.dataset = self.generate_dataset(n, self.true_theta)
+                self.dataset, self.dataset_name = self.generate_dataset(
+                    n, self.true_theta
+                )
                 self.generate_initial_theta(e=e)
-                theta_errors, hessian_inv_errors = self.run([optimizer_pbar, data_pbar])
+                theta_errors, hessian_inv_errors = self.run(
+                    batch_size, pbars=[optimizer_pbar, data_pbar]
+                )
 
                 for name, errors in theta_errors.items():
                     self.theta_errors_avg[name] += errors
@@ -242,10 +266,8 @@ class Simulation:
             axes = [axes]  # Make sure axes is iterable
 
         for ax, (e, errors_dict) in zip(axes, all_errors_avg.items()):
-            markers_cycle = cycle(
-                ["3", "x", "+"]
-            )  # Different markers for different optimizers
-            markevery_cycle = cycle(
+            markers = cycle(["3", "x", "+"])
+            markevery = cycle(
                 [
                     int(i * len(self.dataset) / 100 + len(self.dataset) / 11)
                     for i in range(6)
@@ -254,24 +276,20 @@ class Simulation:
 
             max_error = 0
 
-            for (name, errors), mk, me in zip(
-                errors_dict.items(), markers_cycle, markevery_cycle
-            ):
+            for (name, errors), mk, me in zip(errors_dict.items(), markers, markevery):
                 ax.plot(errors, label=name, marker=mk, markersize=10, markevery=me)
                 max_error = max(max_error, np.max(errors))
 
             ax.set_xscale("log")
             ax.set_yscale("log")
-            ax.set_ylim(
-                top=min(max_error, 1e5)
-            )  # Optionally set a sensible upper limit
+            ax.set_ylim(top=min(max_error, 1e5))
             ax.set_xlabel("Sample size")
             average = f" averaged over {N} run" + ("s" if N > 1 else "")
             ax.set_ylabel(ylabel + average)
             ax.set_title(f"e={e}")
             ax.legend(loc="lower left")
 
-        plt.suptitle(self.g.name)
+        plt.suptitle(self.g.name + ", " + str(self.dataset_name))
         plt.tight_layout()
         plt.show()
 

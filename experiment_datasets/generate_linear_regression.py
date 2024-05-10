@@ -1,10 +1,16 @@
+from typing import Tuple
 import torch
 from torch.utils.data import TensorDataset
 
 
 def generate_linear_regression(
     n: int, true_theta: torch.Tensor, bias: bool = True
-) -> TensorDataset:
+) -> Tuple[TensorDataset, str]:
+    """
+    Generate data from a linear regression model.
+    """
+    name = "linear regression"
+
     d = len(true_theta)
     if bias:
         X = torch.randn(n, d - 1)
@@ -15,4 +21,4 @@ def generate_linear_regression(
 
     Y = phi @ true_theta + torch.randn(n)
 
-    return TensorDataset(X, Y)
+    return TensorDataset(X, Y), name

@@ -9,7 +9,7 @@ def generate_covariance_matrix(d, eigenvalues):
     D = torch.diag(torch.tensor(eigenvalues))
 
     # Generate a random orthogonal matrix Q
-    Q, _ = torch.qr(torch.randn(d, d))
+    Q, R = torch.qr(torch.randn(d, d))
 
     # Ensure Q is truly orthogonal
     Q = Q @ torch.diag(R.diag().sign())
@@ -23,8 +23,10 @@ def generate_geometric_median(
     n: int, true_theta: torch.Tensor, eigenvalues: list = None
 ) -> TensorDataset:
     """
-    Generate data from a multivariate normal distribution with specified eigenvalues for testing.
+    Generate data from a multivariate normal distribution with specified eigenvalues.
     """
+    name = "multivariate_normal"
+
     d = len(true_theta)
     if eigenvalues is None:
         eigenvalues = torch.logspace(-2, 2, d)
@@ -33,4 +35,4 @@ def generate_geometric_median(
     dist = MultivariateNormal(true_theta, covariance_matrix=covariance_matrix)
     X = dist.sample((n,))
 
-    return TensorDataset(X)
+    return TensorDataset(X), name
