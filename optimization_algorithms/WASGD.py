@@ -38,7 +38,7 @@ class WASGD(BaseOptimizer):
         Reset the optimizer state
         """
         self.iter = 0
-        self.theta_not_averaged = initial_theta.detach().copy().to(self.device)
+        self.theta_not_averaged = initial_theta.detach().clone().to(self.device)
         self.sum_weights = 0
 
     def step(

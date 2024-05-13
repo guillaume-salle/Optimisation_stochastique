@@ -23,7 +23,6 @@ from experiment_datasets import (
 # Configuration for the number of runs and size of data
 N = 10
 n = int(1e4)
-batch_size = 1
 
 batch_size = 1  # Online setting
 
@@ -57,13 +56,12 @@ simulation_logistic_regression = partial(
     e_values=e_values,
 )
 
-d = 10
 true_theta_geometric_median = torch.zeros(10)
 simulation_geometric_median = partial(
     Simulation,
     g=GeometricMedian(),
     true_theta=true_theta_geometric_median,
-    generate_dataset=generate_geometric_median,
+    generate_dataset=partial(generate_geometric_median, cov="article"),
     e_values=e_values,
 )
 
@@ -86,7 +84,7 @@ simulation_p_means = partial(
     Simulation,
     g=pMeans(p=p),
     true_theta=true_theta_p_means,
-    generate_dataset=generate_p_means,
+    generate_dataset=partial(generate_p_means, cov="article"),
     e_values=e_values,
 )
 

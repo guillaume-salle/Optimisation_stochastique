@@ -1,5 +1,6 @@
 import torch
 from typing import Tuple
+import math
 
 from optimization_algorithms import BaseOptimizer
 from objective_functions import BaseObjectiveFunction
@@ -65,6 +66,6 @@ class WASNA(BaseOptimizer):
         # Update the theta estimate
         learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         self.theta_not_avg += -learning_rate * hessian_inv @ grad
-        weight_theta = np.log(self.iter + 1) ** self.tau_theta
+        weight_theta = math.log(self.iter + 1) ** self.tau_theta
         self.sum_weights_theta += weight_theta
         theta += (self.theta_not_avg - theta) * weight_theta / self.sum_weights_theta

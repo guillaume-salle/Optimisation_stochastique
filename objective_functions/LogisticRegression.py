@@ -1,6 +1,6 @@
 from typing import Tuple
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from objective_functions import BaseObjectiveFunction, add_bias
 
@@ -22,21 +22,28 @@ class LogisticRegression(BaseObjectiveFunction):
         X = torch.atleast_2d(X)
         if self.bias:
             X = add_bias(X)
-        dot_product = torch.matmul(X, h)
+        dot_product = torch.einsum("ij,j->i", X, h)
         return torch.log(1 + torch.exp(dot_product)) - dot_product * y
 
-    def evaluate_accuracy(self, dataset: Dataset, h: torch.Tensor) -> float:
+    def evaluate_accuracy(
+        self, dataset: Dataset, h: torch.Tensor, batch_size=512
+    ) -> float:
         """
         Compute the accuracy of the model
         """
-        X, Y = dataset.X, dataset.Y
-        if self.bias:
-            X = add_bias(X)
-        dot_product = torch.matmul(X, h)
-        p = torch.sigmoid(dot_product)
-        predictions = (p > 0.5).float()
-        accuracy = (predictions == Y).float().mean().item()
-        return accuracy
+        dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
+        correct_predictions = 0
+        total = 0
+
+        for X, Y in dataloader:
+            if self.bias:
+                X = add_bias(X)
+            dot_product = torch.einsum("ij,j->i", X, h)
+            p = torch.sigmoid(dot_product)
+            predictions = (p > 0.5).float()
+            correct_predictions += (predictions == Y).float().sum().item()
+            total += Y.size(0)
+        return correct_predictions / total
 
     def get_theta_dim(self, data: Tuple) -> int:
         """
@@ -53,7 +60,7 @@ class LogisticRegression(BaseObjectiveFunction):
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        dot_product = torch.matmul(X, h)
+        dot_product = torch.einsum("ij,j->i", X, h)
         p = torch.sigmoid(dot_product)
         grad = torch.einsum("i,ij->j", p - Y, X) / n
         return grad
@@ -66,7 +73,7 @@ class LogisticRegression(BaseObjectiveFunction):
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        dot_product = torch.matmul(X, h)
+        dot_product = torch.einsum("ij,j->i", X, h)
         p = torch.sigmoid(dot_product)
         hessian = torch.einsum("i,ij,ik->jk", p * (1 - p), X, X) / n
         return hessian
@@ -82,7 +89,7 @@ class LogisticRegression(BaseObjectiveFunction):
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        dot_product = torch.matmul(X, h)
+        dot_product = torch.einsum("ij,j->i", X, h)
         p = torch.sigmoid(dot_product)
         grad = torch.einsum("i,ij->j", p - Y, X) / n
         hessian = torch.einsum("i,ij,ik->jk", p * (1 - p), X, X) / n
@@ -101,7 +108,8 @@ class LogisticRegression(BaseObjectiveFunction):
             raise ValueError("The Riccati term is only defined for a single data point")
         if self.bias:
             X = add_bias(X)
-        dot_product = torch.matmul(X, h)
+        X = X.squeeze()
+        dot_product = torch.dot(X, h)
         p = torch.sigmoid(dot_product)
         grad = (p - Y) * X
         riccati = torch.sqrt(p * (1 - p)) * X

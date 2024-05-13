@@ -11,7 +11,7 @@ def generate_spherical_distribution(
     """
     name = "spherical distribution"
 
-    mu = true_theta[:-1].copy()
+    mu = true_theta[:-1]
     r = true_theta[-1]
 
     # U is randomly generated on the unit sphere

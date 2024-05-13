@@ -21,7 +21,7 @@ class LinearRegression(BaseObjectiveFunction):
         X = torch.atleast_2d(X)
         if self.bias:
             X = add_bias(X)
-        Y_pred = torch.matmul(X, h)
+        Y_pred = torch.einsum("ni,i->n", X, h)
         error = Y_pred - y
         return 0.5 * error**2
 
@@ -41,9 +41,9 @@ class LinearRegression(BaseObjectiveFunction):
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        Y_pred = torch.dot(X, h)
+        Y_pred = torch.einsum("ni,i->n", X, h)
         error = Y_pred - y
-        grad = torch.einsum("i,ij->j", error, X) / n
+        grad = torch.einsum("n,ni->i", error, X) / n
         return grad
 
     def hessian(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
@@ -55,7 +55,7 @@ class LinearRegression(BaseObjectiveFunction):
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        hessian = torch.einsum("ij,ik->jk", X, X) / n
+        hessian = torch.einsum("ni,nj->ij", X, X) / n
         return hessian
 
     def grad_and_hessian(
@@ -69,10 +69,10 @@ class LinearRegression(BaseObjectiveFunction):
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        Y_pred = torch.dot(X, h)
+        Y_pred = torch.einsum("ni,i->n", X, h)
         error = Y_pred - y
-        grad = torch.einsum("i,ij->j", error, X) / n
-        hessian = torch.einsum("ij,ik->jk", X, X) / n
+        grad = torch.einsum("n,ni->i", error, X) / n
+        hessian = torch.einsum("nj,nk->jk", X, X) / n
         return grad, hessian
 
     def grad_and_riccati(
@@ -88,8 +88,7 @@ class LinearRegression(BaseObjectiveFunction):
             raise ValueError("The Riccati term is only defined for a single data point")
         if self.bias:
             X = add_bias(X)
+        X = X.squeeze()
         Y_pred = torch.dot(X, h)
-        error = Y_pred - y
-        grad = error * X
-        riccati = X
-        return grad, riccati
+        grad = (Y_pred - y) * X
+        return grad, X

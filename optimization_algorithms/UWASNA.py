@@ -1,5 +1,6 @@
 import torch
 import math
+import random
 from typing import Tuple
 
 from optimization_algorithms import BaseOptimizer
@@ -13,13 +14,13 @@ class UWASNA(BaseOptimizer):
 
     def __init__(
         self,
-        nu: float = 0.75,  # ???
+        nu: float = 0.75,  # Do not take 1 for averaged algorithms
         c_nu: float = 1.0,  # Set to 1.0 in the article
         gamma: float = 0.75,  # Set to 0.75 in the article
         c_gamma: float = 0.1,  # Not specified in the article, 1.0 diverges
         tau_theta: float = 2.0,  # Not specified in the article
         tau_hessian: float = 2.0,  # Not specified in the article
-        generate_Z: str = "normal",
+        generate_Z: str = "canonic",
         add_iter_lr: int = 50,
         device: str = None,
     ):
@@ -94,7 +95,7 @@ class UWASNA(BaseOptimizer):
         Update the hessian estimate with a canonic base random vector
         """
         if self.generate_Z == "canonic":
-            z = torch.randint(0, self.theta_dim)
+            z = random.randint(0, self.theta_dim - 1)
         elif self.generate_Z == "canonic deterministic":
             z = self.k
             self.k += 1
@@ -111,7 +112,7 @@ class UWASNA(BaseOptimizer):
             -self.gamma
         )
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * self.theta_dim <= beta**2:
+        if torch.dot(Q, Q) * self.theta_dim <= beta**2:
             product = self.theta_dim * torch.outer(P, Q)  # Multiply by the dimension
             self.hessian_inv_not_avg += -learning_rate_hessian * (
                 product + product.t() - 2 * torch.eye(self.theta_dim)

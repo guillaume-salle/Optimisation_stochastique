@@ -95,7 +95,7 @@ class Simulation:
 
     def run(
         self, batch_size: int, pbars: Tuple[tqdm, tqdm] = None
-    ) -> Tuple[List[float], List[float]]:
+    ) -> Tuple[dict, dict]:
         """
         Run the experiment for a given initial theta, a dataset and a list of optimizers
         """
@@ -134,7 +134,7 @@ class Simulation:
         for optimizer in self.optimizer_list:
             optimizer.reset(self.initial_theta)
             optimizer_pbar.set_description(optimizer.name)
-            self.theta = self.initial_theta.detach().clone().to(self.device)
+            self.theta = self.initial_theta.clone().to(self.device)
 
             # Log initial error
             self.logging_estimation_error(theta_errors, hessian_inv_errors, optimizer)
@@ -147,27 +147,29 @@ class Simulation:
                 self.logging_estimation_error(
                     theta_errors, hessian_inv_errors, optimizer
                 )
-                data_pbar.update(1)
+                data_pbar.update(batch_size)
             optimizer_pbar.update(1)
 
             # Calculate and store accuracies if test dataset is provided
             if self.test_dataset is not None:
-                train_acc = 100 * round(
-                    self.g.evaluate_accuracy(self.dataset, self.theta), 2
-                )
-                test_acc = 100 * round(
-                    self.g.evaluate_accuracy(self.test_dataset, self.theta), 2
-                )
+                train_acc = self.g.evaluate_accuracy(self.dataset, self.theta)
+                train_acc = round(100 * train_acc, 2)  # percentage
+
+                test_acc = self.g.evaluate_accuracy(self.test_dataset, self.theta)
+                test_acc = round(100 * test_acc, 2)
+
                 accuracies[optimizer.name] = {
                     "Training Accuracy": train_acc,
                     "Test Accuracy": test_acc,
                 }
 
-            # Convert errors to numpy arrays for averaging
+            # Convert errors to torch tensors for averaging
             if theta_errors is not None:
-                theta_errors[optimizer.name] = np.array(theta_errors[optimizer.name])
+                theta_errors[optimizer.name] = torch.tensor(
+                    theta_errors[optimizer.name]
+                )
             if hessian_inv_errors is not None:
-                hessian_inv_errors[optimizer.name] = np.array(
+                hessian_inv_errors[optimizer.name] = torch.tensor(
                     hessian_inv_errors[optimizer.name]
                 )
 
@@ -179,7 +181,7 @@ class Simulation:
             accuracies_df = pd.DataFrame(accuracies)
             styled_df = accuracies_df.style.apply(self.highlight_max, axis=1)
             if self.dataset is not None:
-                styled_df.set_caption("Accuracy on " + self.dataset_name)
+                styled_df.set_caption("Accuracy on " + self.dataset_name + " dataset")
             display(styled_df)
 
         return theta_errors, hessian_inv_errors
@@ -274,22 +276,19 @@ class Simulation:
                 ]
             )
 
-            max_error = 0
-
             for (name, errors), mk, me in zip(errors_dict.items(), markers, markevery):
                 ax.plot(errors, label=name, marker=mk, markersize=10, markevery=me)
-                max_error = max(max_error, np.max(errors))
 
             ax.set_xscale("log")
             ax.set_yscale("log")
-            ax.set_ylim(top=min(max_error, 1e5))
             ax.set_xlabel("Sample size")
-            average = f" averaged over {N} run" + ("s" if N > 1 else "")
-            ax.set_ylabel(ylabel + average)
             ax.set_title(f"e={e}")
             ax.legend(loc="lower left")
 
-        plt.suptitle(self.g.name + ", " + str(self.dataset_name))
+        average = f"Average over {N} run" + ("s" if N > 1 else "")
+        fig.text(0.04, 0.5, ylabel + average, va="center", rotation="vertical")
+
+        plt.suptitle(self.g.name + ", " + str(self.dataset_name) + " dataset")
         plt.tight_layout()
         plt.show()
 

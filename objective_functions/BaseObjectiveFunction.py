@@ -9,7 +9,7 @@ class BaseObjectiveFunction(ABC):
     """
 
     @abstractmethod
-    def __call__(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
+    def __call__(self, data: Tuple | torch.Tensor, h: torch.Tensor) -> torch.Tensor:
         raise NotImplementedError
 
     @abstractmethod

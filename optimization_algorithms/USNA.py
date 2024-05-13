@@ -1,4 +1,5 @@
 import torch
+import random
 from typing import Tuple
 
 from optimization_algorithms import BaseOptimizer
@@ -16,7 +17,7 @@ class USNA(BaseOptimizer):
         c_nu: float = 1.0,  # Set to 1.0 in the article
         gamma: float = 0.75,  # Set to 0.75 in the article
         c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
-        generate_Z: str = "normal",
+        generate_Z: str = "canonic",
         add_iter_lr: int = 20,
         device: str = None,
     ):
@@ -96,7 +97,7 @@ class USNA(BaseOptimizer):
         Update the hessian estimate with a canonic random vector
         """
         if self.generate_Z == "canonic":
-            z = torch.randint(0, self.theta_dim)
+            z = random.randint(0, self.theta_dim - 1)
         elif self.generate_Z == "canonic deterministic":
             z = self.k
             self.k += 1
