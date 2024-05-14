@@ -10,8 +10,8 @@ from itertools import cycle
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from optimization_algorithms import BaseOptimizer
-from objective_functions import BaseObjectiveFunction
+from algorithms_torch_streaming import BaseOptimizer
+from objective_functions_torch_streaming import BaseObjectiveFunction
 
 
 class Simulation:
@@ -173,10 +173,12 @@ class Simulation:
                     hessian_inv_errors[optimizer.name]
                 )
 
+        # Close the progress bars
         if pbars is None:
             optimizer_pbar.close()
             data_pbar.close()
 
+        # Display accuracies if test dataset is provided
         if self.test_dataset is not None:
             accuracies_df = pd.DataFrame(accuracies)
             styled_df = accuracies_df.style.apply(self.highlight_max, axis=1)

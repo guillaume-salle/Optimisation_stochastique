@@ -1,6 +1,6 @@
 import torch
 from functools import partial
-from objective_functions import (
+from objective_functions_torch_streaming import (
     LinearRegression,
     LogisticRegression,
     GeometricMedian,
@@ -8,7 +8,7 @@ from objective_functions import (
     pMeans,
 )
 from simulation import Simulation
-from experiment_datasets import (
+from datasets_torch import (
     generate_logistic_regression,
     generate_linear_regression,
     generate_geometric_median,
@@ -17,8 +17,7 @@ from experiment_datasets import (
     covtype,
 )
 
-# usna streaming: essayer c_nu = d**0.5, d**2/3 et d  TODO
-
+LIBRARY_ALGORITHMS = "algorithms_numpy_online"
 
 # Configuration for the number of runs and size of data
 N = 10
