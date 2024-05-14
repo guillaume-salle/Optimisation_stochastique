@@ -23,8 +23,8 @@ def covtype(test_size: float = 0.2) -> Tuple[TensorDataset, TensorDataset, str]:
     y_binary = np.where(y == 1, 1, 0)  # Convert to binary classification
 
     # Convert numpy arrays to PyTorch tensors
-    X_tensor = torch.tensor(X, dtype=torch.float32)
-    Y_tensor = torch.tensor(y_binary, dtype=torch.long)
+    X_tensor = torch.as_tensor(X, dtype=torch.float32)
+    Y_tensor = torch.as_tensor(y_binary, dtype=torch.long)
 
     # Create a TensorDataset
     full_dataset = TensorDataset(X_tensor, Y_tensor)

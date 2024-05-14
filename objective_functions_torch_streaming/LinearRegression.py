@@ -1,5 +1,5 @@
 import torch
-from typing import Any, Tuple
+from typing import Tuple
 
 from objective_functions_torch_streaming import BaseObjectiveFunction, add_bias
 
@@ -13,7 +13,9 @@ class LinearRegression(BaseObjectiveFunction):
         self.bias = bias
         self.name = "Linear model"
 
-    def __call__(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
+    def __call__(
+        self, data: Tuple[torch.Tensor, torch.Tensor], h: torch.Tensor
+    ) -> torch.Tensor:
         """
         Compute the linear regression loss, works with a batch or a single data point
         """
@@ -22,15 +24,17 @@ class LinearRegression(BaseObjectiveFunction):
         if self.bias:
             X = add_bias(X)
         Y_pred = torch.einsum("ni,i->n", X, h)
-        error = Y_pred - y
-        return 0.5 * error**2
+        return 0.5 * (Y_pred - y) ** 2
 
     def get_theta_dim(self, data: Tuple) -> int:
         """
         Return the dimension of theta
         """
         X, _ = data
-        return X.size(-1) + 1 if self.bias else X.size(-1)
+        if self.bias:
+            return X.size(-1) + 1
+        else:
+            return X.size(-1)
 
     def grad(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
         """
@@ -42,8 +46,7 @@ class LinearRegression(BaseObjectiveFunction):
         if self.bias:
             X = add_bias(X)
         Y_pred = torch.einsum("ni,i->n", X, h)
-        error = Y_pred - y
-        grad = torch.einsum("n,ni->i", error, X) / n
+        grad = torch.einsum("n,ni->i", Y_pred - y, X) / n
         return grad
 
     def hessian(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
@@ -70,8 +73,7 @@ class LinearRegression(BaseObjectiveFunction):
         if self.bias:
             X = add_bias(X)
         Y_pred = torch.einsum("ni,i->n", X, h)
-        error = Y_pred - y
-        grad = torch.einsum("n,ni->i", error, X) / n
+        grad = torch.einsum("n,ni->i", Y_pred - y, X) / n
         hessian = torch.einsum("nj,nk->jk", X, X) / n
         return grad, hessian
 
@@ -91,4 +93,5 @@ class LinearRegression(BaseObjectiveFunction):
         X = X.squeeze()
         Y_pred = torch.dot(X, h)
         grad = (Y_pred - y) * X
-        return grad, X
+        riccati = X
+        return grad, riccati

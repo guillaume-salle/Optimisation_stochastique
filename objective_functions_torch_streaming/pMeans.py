@@ -50,7 +50,7 @@ class pMeans(BaseObjectiveFunction):
             1 / norm,
         )
         # Divide by n here to have d+n operations instead of d^2
-        hessian = torch.eye(d) * torch.mean(norm ** (self.p - 2)) - (
+        hessian = torch.mean(norm ** (self.p - 2)) * torch.eye(d) - (
             2 - self.p
         ) * torch.einsum("n,ni,nj->ij", (safe_inv_norm**2) / n, diff, diff)
         return hessian
@@ -75,5 +75,5 @@ class pMeans(BaseObjectiveFunction):
         # Divide by n here to have d+n operations instead of d^2
         hessian = torch.eye(d) * torch.mean(norm ** (self.p - 2)) - (
             2 - self.p
-        ) * torch.einsum("n,ni,nj->ij", (safe_inv_norm**2) / n, diff, diff)
+        ) * torch.einsum("n,ni,nj->ij", safe_inv_norm ** (self.p - 4) / n, diff, diff)
         return grad, hessian

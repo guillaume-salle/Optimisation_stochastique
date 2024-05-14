@@ -1,11 +1,16 @@
 import numpy as np
-from typing import List, Tuple
-from experiment_datasets import MyDataset
+from typing import Tuple
+from datasets_numpy import MyDataset
 
 
 def generate_linear_regression(
     n: int, true_theta: np.ndarray, bias: bool = True
-) -> MyDataset:
+) -> Tuple[MyDataset, str]:
+    """
+    Generate data from a linear regression model.
+    """
+    name = "linear regression"
+
     d = len(true_theta)
     if bias:
         X = np.random.randn(n, d - 1)
@@ -13,5 +18,7 @@ def generate_linear_regression(
     else:
         X = np.random.randn(n, d)
         phi = X
+
     Y = phi @ true_theta + np.random.randn(n)
-    return MyDataset(X=X, Y=Y)
+
+    return MyDataset(X=X, Y=Y), name

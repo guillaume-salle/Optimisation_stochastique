@@ -1,7 +1,7 @@
 import numpy as np
-from typing import Any, Tuple
+from typing import Tuple
 
-from objective_functions import BaseObjectiveFunction
+from objective_functions_numpy_online import BaseObjectiveFunction
 
 
 class pMeans(BaseObjectiveFunction):
@@ -12,36 +12,54 @@ class pMeans(BaseObjectiveFunction):
     def __init__(self, p: float = 1.5):
         self.name = "p-means"
         self.p = p
+        self.atol = 1e-7
 
     def __call__(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
-        return (np.linalg.norm(X - h) ** self.p) / self.p
+        return (np.linalg.norm(X - h, axis=1) ** self.p) / self.p
 
-    def get_theta_dim(self, X: np.ndarray) -> int:
+    def get_theta_dim(self, data: np.ndarray) -> int:
         """
         Return the dimension of theta
         """
+        X = data
         return X.shape[-1]
 
-    def grad(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
-        return -(X - h) * np.linalg.norm(X - h) ** (self.p - 2)
+    def grad(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """
+        Compute the gradient of the objective function
+        """
+        X = data
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        grad = diff * norm ** (self.p - 2)
+        return grad
 
-    def hessian(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
-        norm = np.linalg.norm(X - h)
-        if norm == 0:
-            return np.zeros((h.shape[0], h.shape[0]))
+    def hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """
+        Compute the Hessian of the objective function, returns Id if h is close to X
+        """
+        X = data
+        d = h.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        if norm < self.atol:
+            return np.eye(d)
         else:
             return norm ** (self.p - 2) * (
-                np.eye(h.shape[0]) - (2 - self.p) * np.outer(X - h, X - h) / norm**2
+                np.eye(d) - (2 - self.p) * np.outer(diff, diff) / norm**2
             )
 
     def grad_and_hessian(
-        self, X: np.ndarray, h: np.ndarray
+        self, data: np.ndarray, h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        norm = np.linalg.norm(X - h)
-        if norm == 0:
-            return np.zeros_like(h), np.zeros((h.shape[0], h.shape[0]))
-        grad = -(X - h) * norm ** (self.p - 2)
+        X = data
+        d = h.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        if norm < self.atol:
+            return np.zeros_like(h), np.eye(d)
+        grad = diff * norm ** (self.p - 2)
         hessian = norm ** (self.p - 2) * (
-            np.eye(h.shape[0]) - (2 - self.p) * np.outer(X - h, X - h) / norm**2
+            np.eye(d) - (2 - self.p) * np.outer(diff, diff) / norm**2
         )
         return grad, hessian

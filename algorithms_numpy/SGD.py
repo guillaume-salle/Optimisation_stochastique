@@ -1,8 +1,8 @@
 import numpy as np
 from typing import Tuple
 
-from algorithms_torch_streaming import BaseOptimizer
-from objective_functions_torch_streaming import BaseObjectiveFunction
+from algorithms_torch import BaseOptimizer
+from objective_functions_numpy_online import BaseObjectiveFunction
 
 
 class SGD(BaseOptimizer):

@@ -1,5 +1,5 @@
 import torch
-from typing import Any
+from typing import Tuple
 from abc import ABC, abstractmethod
 
 from objective_functions_torch_streaming import BaseObjectiveFunction
@@ -23,7 +23,7 @@ class BaseOptimizer(ABC):
 
     def step(
         self,
-        data: Any,
+        data: torch.Tensor | Tuple[torch.Tensor, torch.Tensor],
         theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ) -> None:

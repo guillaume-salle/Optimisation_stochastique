@@ -2,7 +2,7 @@ import torch
 import random
 from typing import Tuple
 
-from algorithms_torch_streaming import BaseOptimizer
+from algorithms_torch import BaseOptimizer
 from objective_functions_torch_streaming import BaseObjectiveFunction
 
 
@@ -60,7 +60,7 @@ class USNA(BaseOptimizer):
 
     def step(
         self,
-        data: Tuple[torch.Tensor, torch.Tensor] | torch.Tensor,
+        data: torch.Tensor | Tuple[torch.Tensor, torch.Tensor],
         theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ):

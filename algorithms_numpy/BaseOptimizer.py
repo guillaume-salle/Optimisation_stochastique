@@ -1,8 +1,8 @@
 import numpy as np
-from typing import Any
+from typing import Tuple
 from abc import ABC, abstractmethod
 
-from objective_functions_torch_streaming import BaseObjectiveFunction
+from objective_functions_numpy_online import BaseObjectiveFunction
 
 
 class BaseOptimizer(ABC):

@@ -1,7 +1,7 @@
 import numpy as np
-from typing import Any, Tuple
+from typing import Tuple
 
-from objective_functions import BaseObjectiveFunction
+from objective_functions_numpy_online import BaseObjectiveFunction, add_bias
 
 
 class LinearRegression(BaseObjectiveFunction):
@@ -13,66 +13,77 @@ class LinearRegression(BaseObjectiveFunction):
         self.bias = bias
         self.name = "Linear model"
 
-    def __call__(self, X: Any, theta: np.ndarray) -> np.ndarray:
+    def __call__(
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
+    ) -> np.ndarray:
         """
         Compute the linear regression loss, works with a batch or a single data point
         """
-        x, y = X
-        x = np.atleast_2d(x)
-        phi = np.hstack([np.ones((x.shape[0], 1)), x]) if self.bias else x
-        Y_pred = np.dot(phi, theta)
-        error = Y_pred - y
-        return 0.5 * np.dot(error, error)
+        X, y = data
+        X = np.atleast_2d(X)
+        if self.bias:
+            X = add_bias(X)
+        Y_pred = np.dot(X, theta)
+        return 0.5 * (Y_pred - y) ** 2
 
-    def get_theta_dim(self, X: Any) -> int:
+    def get_theta_dim(self, data: Tuple[np.ndarray, np.ndarray]) -> int:
         """
         Return the dimension of theta
         """
-        x, _ = X
-        return x.shape[-1] + 1 if self.bias else x.shape[-1]
+        X, _ = data
+        if self.bias:
+            return X.shape[-1] + 1
+        else:
+            return X.shape[-1]
 
-    def grad(self, X: Any, theta: np.ndarray) -> np.ndarray:
+    def grad(
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
+    ) -> np.ndarray:
         """
         Compute the gradient of the linear regression loss, works only for a single data point
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        Y_pred = np.dot(phi, theta)
-        error = Y_pred - y
-        return error * phi
+        X, y = data
+        if self.bias:
+            X = add_bias(X)
+        Y_pred = np.dot(X, theta)
+        grad = (Y_pred - y) * X
+        return grad
 
-    def hessian(self, X: Any, theta: np.ndarray) -> np.ndarray:
+    def hessian(
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
+    ) -> np.ndarray:
         """
         Compute the Hessian of the linear regression loss, works only for a single data point
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        return np.outer(phi, phi)
+        X, _ = data
+        if self.bias:
+            X = add_bias(X)
+        return np.outer(X, X)
 
     def grad_and_hessian(
-        self, X: Any, theta: np.ndarray
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Hessian of the linear regression loss, works only for a single data point
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        Y_pred = np.dot(phi, theta)
-        error = Y_pred - y
-        grad = error * phi
-        hessian = np.outer(phi, phi)
+        X, y = data
+        if self.bias:
+            X = add_bias(X)
+        Y_pred = np.dot(X, theta)
+        grad = (Y_pred - y) * X
+        hessian = np.outer(X, X)
         return grad, hessian
 
     def grad_and_riccati(
-        self, X: Any, theta: np.ndarray, iter: int = None
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Riccati of the linear regression loss, works only for a single data point
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        Y_pred = np.dot(phi, theta)
-        error = Y_pred - y
-        grad = error * phi
-        riccati = phi
+        X, y = data
+        if self.bias:
+            X = add_bias(X)
+        Y_pred = np.dot(X, theta)
+        grad = (Y_pred - y) * X
+        riccati = X
         return grad, riccati

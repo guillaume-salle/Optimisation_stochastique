@@ -1,7 +1,9 @@
-import numpy as np
+import torch
+import math
+import random
 from typing import Tuple
 
-from algorithms_torch_streaming import BaseOptimizer
+from algorithms_torch import BaseOptimizer
 from objective_functions_torch_streaming import BaseObjectiveFunction
 
 
@@ -12,14 +14,15 @@ class UWASNA(BaseOptimizer):
 
     def __init__(
         self,
-        nu: float = 0.75,  # Do not use 1 for averaged algo
+        nu: float = 0.75,  # Do not take 1 for averaged algorithms
         c_nu: float = 1.0,  # Set to 1.0 in the article
         gamma: float = 0.75,  # Set to 0.75 in the article
         c_gamma: float = 0.1,  # Not specified in the article, 1.0 diverges
         tau_theta: float = 2.0,  # Not specified in the article
         tau_hessian: float = 2.0,  # Not specified in the article
-        generate_Z: str = "normal",
+        generate_Z: str = "canonic",
         add_iter_lr: int = 50,
+        device: str = None,
     ):
         self.name = (
             ("UWASNA" if tau_theta != 0.0 or tau_hessian != 0.0 else "USNA")
@@ -51,26 +54,29 @@ class UWASNA(BaseOptimizer):
             raise ValueError(
                 "Invalid value for Z. Choose 'normal', 'canonic' or 'canonic deterministic'."
             )
+        self.device = device
+        if device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def reset(self, initial_theta: np.ndarray):
+    def reset(self, initial_theta: torch.Tensor):
         """
         Reset the learning rate and estimate of the hessian
         """
         self.iter = 0
         self.theta_dim = initial_theta.shape[0]
-        self.theta_not_avg = np.copy(initial_theta)
+        self.theta_not_avg = initial_theta.detach().clone().to(self.device)
         self.sum_weights_theta = 0
-        self.hessian_inv_not_avg = np.eye(self.theta_dim)
-        self.hessian_inv = np.eye(self.theta_dim)
+        self.hessian_inv_not_avg = torch.eye(self.theta_dim, device=self.device)
+        self.hessian_inv = torch.eye(self.theta_dim, device=self.device)
         self.sum_weights_hessian = 0
         if self.generate_Z == "canonic deterministic":
             self.k = 0
 
-    def update_hessian_normal(self, hessian: np.ndarray):
+    def update_hessian_normal(self, hessian: torch.Tensor):
         """
         Update the hessian estimate with a normal random vector
         """
-        Z = np.random.randn(self.theta_dim)
+        Z = torch.randn(self.theta_dim, device=self.device)
         # Use the non averaged hessian to compute P
         P = self.hessian_inv_not_avg @ Z
         Q = hessian @ Z
@@ -78,18 +84,18 @@ class UWASNA(BaseOptimizer):
             -self.gamma
         )
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
-            product = np.outer(P, Q)
+        if torch.dot(Q, Q) * torch.dot(Z, Z) <= beta**2:
+            product = torch.outer(P, Q)
             self.hessian_inv_not_avg += -learning_rate_hessian * (
-                product + product.transpose() - 2 * np.eye(self.theta_dim)
+                product + product.t() - 2 * torch.eye(self.theta_dim)
             )
 
-    def update_hessian_canonic(self, hessian: np.ndarray):
+    def update_hessian_canonic(self, hessian: torch.Tensor):
         """
         Update the hessian estimate with a canonic base random vector
         """
         if self.generate_Z == "canonic":
-            z = np.random.randint(0, self.theta_dim)
+            z = random.randint(0, self.theta_dim - 1)
         elif self.generate_Z == "canonic deterministic":
             z = self.k
             self.k += 1
@@ -106,16 +112,16 @@ class UWASNA(BaseOptimizer):
             -self.gamma
         )
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * self.theta_dim <= beta**2:
-            product = self.theta_dim * np.outer(P, Q)  # Multiply by the dimension
+        if torch.dot(Q, Q) * self.theta_dim <= beta**2:
+            product = self.theta_dim * torch.outer(P, Q)  # Multiply by the dimension
             self.hessian_inv_not_avg += -learning_rate_hessian * (
-                product + product.transpose() - 2 * np.eye(self.theta_dim)
+                product + product.t() - 2 * torch.eye(self.theta_dim)
             )
 
     def step(
         self,
-        data: np.ndarary | Tuple[np.ndarray, np.ndarray],
-        theta: np.ndarray,
+        data: torch.Tensor | Tuple[torch.Tensor, torch.Tensor],
+        theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ):
         """
@@ -128,7 +134,7 @@ class UWASNA(BaseOptimizer):
         self.update_hessian(hessian)
 
         # Update the averaged hessian
-        weight_hessian = np.log(self.iter + 1) ** self.tau_hessian
+        weight_hessian = math.log(self.iter + 1) ** self.tau_hessian
         self.sum_weights_hessian += weight_hessian
         self.hessian_inv += (
             (self.hessian_inv_not_avg - self.hessian_inv)
@@ -139,6 +145,6 @@ class UWASNA(BaseOptimizer):
         # Update the theta estimate with the averaged hessian
         learning_rate_theta = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         self.theta_not_avg += -learning_rate_theta * self.hessian_inv @ grad
-        weight_theta = np.log(self.iter + 1) ** self.tau_theta
+        weight_theta = math.log(self.iter + 1) ** self.tau_theta
         self.sum_weights_theta += weight_theta
         theta += (self.theta_not_avg - theta) * weight_theta / self.sum_weights_theta

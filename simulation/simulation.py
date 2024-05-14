@@ -10,7 +10,7 @@ from itertools import cycle
 import torch
 from torch.utils.data import Dataset, DataLoader
 
-from algorithms_torch_streaming import BaseOptimizer
+from algorithms_torch import BaseOptimizer
 from objective_functions_torch_streaming import BaseObjectiveFunction
 
 

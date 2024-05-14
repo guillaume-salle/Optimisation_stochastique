@@ -1,11 +1,12 @@
 import numpy as np
+import math
 from typing import Tuple
 
-from algorithms_torch_streaming import BaseOptimizer
-from objective_functions_torch_streaming import BaseObjectiveFunction
+from algorithms_numpy import BaseOptimizer
+from objective_functions_numpy_online import BaseObjectiveFunction
 
 
-class WASNARiccati(BaseOptimizer):
+class WASNA(BaseOptimizer):
     """
     Stochastic Newton Algorithm optimizer
     """
@@ -18,9 +19,8 @@ class WASNARiccati(BaseOptimizer):
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix
     ):
-        self.class_name = "WASNARiccati"
         self.name = (
-            ("WASNARiccati" if tau_theta != 0.0 else "SNA-Riccati")
+            ("WASNA" if tau_theta != 0.0 else "SNA*")
             + (f" ν={nu}" if nu != 1.0 else "")
             + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
         )
@@ -39,9 +39,7 @@ class WASNARiccati(BaseOptimizer):
         self.theta_not_avg = np.copy(initial_theta)
         self.sum_weights_theta = 0
         # Weight more the initial identity matrix
-        self.hessian_bar_inv = (
-            1 / (self.lambda_ * self.theta_dim) * np.eye(self.theta_dim)
-        )
+        self.hessian_bar = self.lambda_ * self.theta_dim * np.eye(self.theta_dim)
 
     def step(
         self,
@@ -53,21 +51,17 @@ class WASNARiccati(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, phi = g.grad_and_riccati(data, theta, self.iter)
+        grad, hessian = g.grad_and_hessian(data, theta)
 
         # Update the hessian estimate
-        product = self.hessian_bar_inv @ phi
-        denominator = 1 + np.dot(phi, product)
-        self.hessian_bar_inv += -np.outer(product, product) / denominator
+        self.hessian_bar += hessian
+        hessian_inv = np.linalg.inv(
+            self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
+        )
 
         # Update the theta estimate
         learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
-        self.theta_not_avg += (
-            -learning_rate
-            * (self.iter + self.lambda_ * self.theta_dim)
-            * self.hessian_bar_inv
-            @ grad
-        )
-        weigth_theta = np.log(self.iter + 1) ** self.tau_theta
-        self.sum_weights_theta += weigth_theta
-        theta += (self.theta_not_avg - theta) * weigth_theta / self.sum_weights_theta
+        self.theta_not_avg += -learning_rate * hessian_inv @ grad
+        weight_theta = math.log(self.iter + 1) ** self.tau_theta
+        self.sum_weights_theta += weight_theta
+        theta += (self.theta_not_avg - theta) * weight_theta / self.sum_weights_theta

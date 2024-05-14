@@ -5,8 +5,6 @@ from objective_functions_torch_streaming import (
     LogisticRegression,
     GeometricMedian,
     SphericalDistribution,
-    SphericalDistributionNumpy,
-    SphericalDistributionNumpyOnline,
     pMeans,
 )
 from simulation import Simulation
@@ -19,12 +17,11 @@ from datasets_torch import (
     covtype,
 )
 
-# usna streaming: essayer c_nu = d**0.5, d**2/3 et d  TODO
-
 
 # Configuration for the number of runs and size of data
 N = 10
 n = int(1e4)
+batch_size = 1
 
 batch_size = 1  # Online setting
 
@@ -42,7 +39,6 @@ nu_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 gamma_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 e_values = [1, 2]
 
-# Linear regression
 simulation_linear_regression = partial(
     Simulation,
     g=LinearRegression(bias=bias_setting),
@@ -51,7 +47,6 @@ simulation_linear_regression = partial(
     e_values=e_values,
 )
 
-# Logistic regression
 simulation_logistic_regression = partial(
     Simulation,
     g=LogisticRegression(bias=bias_setting),
@@ -60,7 +55,7 @@ simulation_logistic_regression = partial(
     e_values=e_values,
 )
 
-# Geometric median
+d = 10
 true_theta_geometric_median = torch.zeros(10)
 simulation_geometric_median = partial(
     Simulation,
@@ -70,7 +65,6 @@ simulation_geometric_median = partial(
     e_values=e_values,
 )
 
-# Spherical distribution
 mu = torch.zeros(3)
 r = 2.0
 delta = 0.2
@@ -83,33 +77,6 @@ simulation_spherical_distribution = partial(
     e_values=[0.5, 1],
 )
 
-# Spherical distribution with numpy
-mu = torch.zeros(3)
-r = 2.0
-delta = 0.2
-true_theta_spherical_distribution = torch.cat((mu, torch.tensor([r])))
-simulation_spherical_distribution_numpy = partial(
-    Simulation,
-    g=SphericalDistributionNumpy(),
-    true_theta=true_theta_spherical_distribution,
-    generate_dataset=partial(generate_spherical_distribution, delta=delta),
-    e_values=[0.5, 1],
-)
-
-# Spherical distribution with numpy ONLINE
-mu = torch.zeros(3)
-r = 2.0
-delta = 0.2
-true_theta_spherical_distribution = torch.cat((mu, torch.tensor([r])))
-simulation_spherical_distribution_numpy_online = partial(
-    Simulation,
-    g=SphericalDistributionNumpyOnline(),
-    true_theta=true_theta_spherical_distribution,
-    generate_dataset=partial(generate_spherical_distribution, delta=delta),
-    e_values=[0.5, 1],
-)
-
-# p-means
 d = 40
 p = 1.5
 true_theta_p_means = torch.zeros(d)
@@ -121,7 +88,6 @@ simulation_p_means = partial(
     e_values=e_values,
 )
 
-# Covtype
 train_covtype, test_covtype, name = covtype()
 eval_covtype = partial(
     Simulation,

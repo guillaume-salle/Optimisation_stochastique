@@ -4,8 +4,6 @@ from .LinearRegression import LinearRegression
 from .LogisticRegression import LogisticRegression
 from .GeometricMedian import GeometricMedian
 from .SphericalDistribution import SphericalDistribution
-from .SphericalDistributionNumpy import SphericalDistributionNumpy
-from .SphericalDistributionNumpyOnline import SphericalDistributionNumpyOnline
 from .pMeans import pMeans
 
 __all__ = [
@@ -15,7 +13,5 @@ __all__ = [
     "LogisticRegression",
     "GeometricMedian",
     "SphericalDistribution",
-    "SphericalDistributionNumpy",
-    "SphericalDistributionNumpyOnline",
     "pMeans",
 ]

@@ -1,9 +1,10 @@
 import torch
 from torch.distributions import MultivariateNormal
 from torch.utils.data import TensorDataset
+from typing import List
 
 
-def generate_covariance_matrix(d, eigenvalues):
+def generate_covariance_matrix(d, eigenvalues) -> torch.Tensor:
     """Generate a covariance matrix with specified eigenvalues."""
     # Create a diagonal matrix of eigenvalues
     D = torch.diag(torch.tensor(eigenvalues))
@@ -22,8 +23,8 @@ def generate_covariance_matrix(d, eigenvalues):
 def generate_geometric_median(
     n: int,
     true_theta: torch.Tensor,
-    # eigenvalues: list = None,
-) -> TensorDataset:
+    # eigenvalues: List[float] = None,
+) -> Tuple[TensorDataset, str]:
     """
     Generate data from a multivariate normal distribution with specified eigenvalues.
     """

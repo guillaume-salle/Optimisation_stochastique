@@ -1,4 +1,4 @@
-import torch
+import numpy as np
 from functools import partial
 from objective_functions_torch_streaming import (
     LinearRegression,
@@ -17,17 +17,15 @@ from datasets_torch import (
     covtype,
 )
 
-LIBRARY_ALGORITHMS = "algorithms_numpy_online"
 
 # Configuration for the number of runs and size of data
 N = 10
 n = int(1e4)
-batch_size = 1
 
 batch_size = 1  # Online setting
 
 # Configuration for true theta
-true_theta = torch.tensor(
+true_theta = np.array(
     [0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0]
 )  # Article, set bias=True
 # true_theta = torch.tensor([-2., -1., 0., 1., 2.])            # Slides, bias=False
@@ -40,6 +38,7 @@ nu_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 gamma_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 e_values = [1, 2]
 
+# Linear regression
 simulation_linear_regression = partial(
     Simulation,
     g=LinearRegression(bias=bias_setting),
@@ -48,6 +47,7 @@ simulation_linear_regression = partial(
     e_values=e_values,
 )
 
+# Logistic regression
 simulation_logistic_regression = partial(
     Simulation,
     g=LogisticRegression(bias=bias_setting),
@@ -56,8 +56,8 @@ simulation_logistic_regression = partial(
     e_values=e_values,
 )
 
-d = 10
-true_theta_geometric_median = torch.zeros(10)
+# Geometric median
+true_theta_geometric_median = np.zeros(10)
 simulation_geometric_median = partial(
     Simulation,
     g=GeometricMedian(),
@@ -66,10 +66,11 @@ simulation_geometric_median = partial(
     e_values=e_values,
 )
 
-mu = torch.zeros(3)
+# Spherical distribution
+mu = np.zeros(3)
 r = 2.0
 delta = 0.2
-true_theta_spherical_distribution = torch.cat((mu, torch.tensor([r])))
+true_theta_spherical_distribution = np.append(mu, r)
 simulation_spherical_distribution = partial(
     Simulation,
     g=SphericalDistribution(),
@@ -78,9 +79,11 @@ simulation_spherical_distribution = partial(
     e_values=[0.5, 1],
 )
 
+
+# p-means
 d = 40
 p = 1.5
-true_theta_p_means = torch.zeros(d)
+true_theta_p_means = np.zeros(d)
 simulation_p_means = partial(
     Simulation,
     g=pMeans(p=p),
@@ -89,6 +92,7 @@ simulation_p_means = partial(
     e_values=e_values,
 )
 
+# Covtype
 train_covtype, test_covtype, name = covtype()
 eval_covtype = partial(
     Simulation,
@@ -98,7 +102,7 @@ eval_covtype = partial(
     dataset=train_covtype,
     test_dataset=test_covtype,
     dataset_name=name,
-    initial_theta=torch.zeros(54 + 1),
+    initial_theta=np.zeros(54 + 1),
     e_values=None,
 )
 

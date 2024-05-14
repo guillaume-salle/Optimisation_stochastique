@@ -98,12 +98,9 @@ class GeometricMedian(BaseObjectiveFunction):
         X = X.squeeze()
         diff = h - X
         norm = torch.norm(diff)
-        safe_inv_norm = torch.where(
-            torch.isclose(norm, torch.zeros_like(norm), atol=self.atol),
-            torch.ones_like(norm),
-            1 / norm,
-        )
-        grad = safe_inv_norm * diff
+        if norm < self.atol:
+            return torch.zeros_like(h), torch.zeros_like(h)
+        grad = diff / norm
         Z = torch.randn(d)
         alpha = 1 / (iter * math.log(iter + 1))
         # grad expects a tuple batch

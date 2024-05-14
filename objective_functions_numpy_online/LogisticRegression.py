@@ -1,8 +1,8 @@
 import numpy as np
 from typing import Tuple
 
-from objective_functions import BaseObjectiveFunction
-from datasets_torch import MyDataset
+from objective_functions_numpy_online import BaseObjectiveFunction, add_bias
+from datasets_numpy import MyDataset
 
 
 def sigmoid(z: float):
@@ -13,41 +13,9 @@ def sigmoid(z: float):
         return np.exp(z) / (1 + np.exp(z))
 
 
-def sigmoid_array(z):
+def sigmoid_array(z: np.ndarray) -> np.ndarray:
     """Compute the sigmoid function in a stable way for arrays."""
-    # positive_mask = np.zeros_like(z, dtype=bool)
-    # positive_mask[z >= 0] = True
-    positive_mask = z >= 0
-    negative_mask = ~positive_mask
-
-    sigmoid = np.zeros_like(z, dtype=float)
-
-    # Positive elements
-    exp_neg = np.exp(-z[positive_mask])
-    sigmoid[positive_mask] = 1 / (1 + exp_neg)
-
-    # Negative elements
-    exp_pos = np.exp(z[negative_mask])
-    sigmoid[negative_mask] = exp_pos / (1 + exp_pos)
-
-    return sigmoid
-
-
-def sigmoid_array(z):
-    """Compute the sigmoid function in a stable way for arrays."""
-    positive_mask = z >= 0
-    negative_mask = ~positive_mask
-
-    sigmoid = np.zeros_like(z, dtype=float)  # Ensuring the array is of float type
-
-    # Positive elements
-    exp_neg = np.exp(-z[positive_mask])
-    sigmoid[positive_mask] = 1 / (1 + exp_neg)
-
-    # Negative elements
-    exp_pos = np.exp(z[negative_mask])
-    sigmoid[negative_mask] = exp_pos / (1 + exp_pos)
-
+    sigmoid = np.where(z >= 0, 1 / (1 + np.exp(-z)), np.exp(z) / (1 + np.exp(z)))
     return sigmoid
 
 
@@ -60,93 +28,104 @@ class LogisticRegression(BaseObjectiveFunction):
         self.name = "Logistic model"
         self.bias = bias
 
-    def __call__(self, X: Tuple, h: np.ndarray) -> np.ndarray:
+    def __call__(
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray
+    ) -> np.ndarray:
         """
         Compute the logistic loss, works with a batch or a single data point
         """
-        x, y = X
-        x = np.atleast_2d(x)
-        phi = np.hstack([np.ones((x.shape[0], 1)), x]) if self.bias else x
-        dot_product = np.dot(phi, h)
+        X, y = data
+        X = np.atleast_2d(X)
+        if self.bias:
+            X = add_bias(X)
+        dot_product = np.dot(X, h)
         return np.log(1 + np.exp(dot_product)) - dot_product * y
 
-    def evaluate_accuracy(self, dataset: MyDataset, h: np.ndarray) -> float:
+    def evaluate_accuracy(
+        self, dataset: MyDataset, h: np.ndarray, batch_size=512
+    ) -> float:
         """
         Compute the accuracy of the model
         """
         X, Y = dataset.X, dataset.Y
-        X = np.atleast_2d(X)
-        phi = np.hstack([np.ones((X.shape[0], 1)), X]) if self.bias else X
-        dot_product = np.dot(phi, h)
-        p = sigmoid_array(dot_product)
-        return round(100 * np.mean((p > 0.5) == Y), 2)
+        correct_predictions = 0
+        total = 0
 
-    def get_theta_dim(self, X: Tuple) -> int:
+        for i in range(0, X.shape[0], batch_size):
+            X_batch = X[i : i + batch_size]
+            Y_batch = Y[i : i + batch_size]
+            if self.bias:
+                X_batch = add_bias(X_batch)
+            dot_product = np.dot(X_batch, h)
+            p = sigmoid_array(dot_product)
+            predictions = (p > 0.5).astype(int)
+            correct_predictions += np.sum(predictions == Y_batch)
+            total += Y_batch.shape[0]
+
+        return correct_predictions / total
+
+    def get_theta_dim(self, data: Tuple[np.ndarray, np.ndarray]) -> int:
         """
         Return the dimension of theta
         """
-        x, _ = X
-        return x.shape[-1] + 1 if self.bias else x.shape[-1]
+        X, _ = data
+        if self.bias:
+            return X.shape[-1] + 1
+        else:
+            return X.shape[-1]
 
-    def grad(self, X: Tuple, h: np.ndarray) -> np.ndarray:
+    def grad(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
         """
         Compute the gradient of the logistic loss, works only for a single data point
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        dot_product = np.dot(phi, h)
+        X, y = data
+        if self.bias:
+            X = add_bias(X)
+        dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
-        # grad = (p - Y)[:, np.newaxis] * phi
-        grad = (p - y) * phi  # Equivalent
+        grad = (p - y) * X
         return grad
 
-    def hessian(self, X: Tuple, h: np.ndarray) -> np.ndarray:
+    def hessian(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
         """
         Compute the Hessian of the logistic loss, works only for a single data point
         """
-        x, _ = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        dot_product = np.dot(phi, h)
+        X, _ = data
+        if self.bias:
+            X = add_bias(X)
+        dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
-        hessian = p * (1 - p) * np.outer(phi, phi)
+        hessian = p * (1 - p) * np.outer(X, X)
         return hessian
 
     def grad_and_hessian(
-        self, X: Tuple, h: np.ndarray
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Hessian of the logistic loss
         Does not work for a batch of data because of the outer product
         """
-        # For batch data, should work
-        # n, d = X.shape
-        # phi = np.hstack([np.ones(n, 1), X]) if self.bias else X
-        # dot_product = np.dot(phi, h)
-        # p = sigmoid(dot_product)
-        # grad = (p - Y) * phi
-        # hessian = np.einsum('i,ij,ik->ijk', p * (1 - p), phi, phi)
-        # return grad, hessian
-
-        # For a single data point
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        dot_product = np.dot(phi, h)
+        X, y = data
+        if self.bias:
+            X = add_bias(X)
+        dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
-        grad = (p - y) * phi
-        hessian = p * (1 - p) * np.outer(phi, phi)
+        grad = (p - y) * X
+        hessian = p * (1 - p) * np.outer(X, X)
         return grad, hessian
 
     def grad_and_riccati(
-        self, X: Tuple, h: np.ndarray, iter: int = None
+        self, data: Tuple, h: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Ricatti of the logistic loss
         Does not work for a batch of data because of the outer product
         """
-        x, y = X
-        phi = np.hstack([np.ones((1,)), x]) if self.bias else x
-        dot_product = np.dot(phi, h)
+        X, y = data
+        if self.bias:
+            X = add_bias(X)
+        dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
-        grad = (p - y) * phi
-        ricatti = np.sqrt(p * (1 - p)) * phi
+        grad = (p - y) * X
+        ricatti = np.sqrt(p * (1 - p)) * X
         return grad, ricatti

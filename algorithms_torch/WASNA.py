@@ -2,7 +2,7 @@ import torch
 from typing import Tuple
 import math
 
-from algorithms_torch_streaming import BaseOptimizer
+from algorithms_torch import BaseOptimizer
 from objective_functions_torch_streaming import BaseObjectiveFunction
 
 
@@ -40,14 +40,14 @@ class WASNA(BaseOptimizer):
         """
         self.iter = 0
         self.theta_dim = initial_theta.size(0)
-        self.theta_not_avg = initial_theta.detach().clone().to(self.device)
+        self.theta_not_avg = initial_theta.clone().to(self.device)
         self.sum_weights_theta = 0
         # Weight more the initial identity matrix
         self.hessian_bar = self.lambda_ * self.theta_dim * torch.eye(self.theta_dim)
 
     def step(
         self,
-        data: Tuple | torch.Tensor,
+        data: torch.Tensor | Tuple[torch.Tensor, torch.Tensor],
         theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ):

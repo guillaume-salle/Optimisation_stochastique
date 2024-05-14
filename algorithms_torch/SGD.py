@@ -1,7 +1,7 @@
 import torch
-from typing import Any
+from typing import Tuple
 
-from algorithms_torch_streaming import BaseOptimizer
+from algorithms_torch import BaseOptimizer
 from objective_functions_torch_streaming import BaseObjectiveFunction
 
 
@@ -25,7 +25,7 @@ class SGD(BaseOptimizer):
 
     def step(
         self,
-        data: Any,
+        data: torch.Tensor | Tuple[torch.Tensor, torch.Tensor],
         theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ):

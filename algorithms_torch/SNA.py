@@ -1,7 +1,7 @@
 import torch
-from typing import Any
+from typing import Tuple
 
-from algorithms_torch_streaming import BaseOptimizer
+from algorithms_torch import BaseOptimizer
 from objective_functions_torch_streaming import BaseObjectiveFunction
 
 
@@ -33,7 +33,7 @@ class SNA(BaseOptimizer):
 
     def step(
         self,
-        data: Any,
+        data: torch.Tensor | Tuple[torch.Tensor, torch.Tensor],
         theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ):
@@ -43,12 +43,8 @@ class SNA(BaseOptimizer):
         self.iter += 1
         grad, hessian = g.grad_and_hessian(data, theta)
         self.hessian_bar += hessian
-        try:
-            hessian_inv = torch.inverse(
-                self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
-            )
-        except RuntimeError:
-            # Hessian is not invertible
-            hessian_inv = torch.eye(self.theta_dim)
+        hessian_inv = torch.inverse(
+            self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
+        )
         learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         theta += -learning_rate * hessian_inv @ grad

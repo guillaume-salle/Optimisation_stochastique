@@ -1,7 +1,8 @@
-import numpy as np
+import torch
+import math
 from typing import Tuple
 
-from algorithms_torch_streaming import BaseOptimizer
+from algorithms_torch import BaseOptimizer
 from objective_functions_torch_streaming import BaseObjectiveFunction
 
 
@@ -12,7 +13,12 @@ class WASGD(BaseOptimizer):
     """
 
     def __init__(
-        self, nu: float, c_mu: float = 1.0, tau: float = 2.0, add_iter_lr: int = 20
+        self,
+        nu: float,
+        c_mu: float = 1.0,
+        tau: float = 2.0,
+        add_iter_lr: int = 20,
+        device: str = None,
     ):
         self.name = (
             ("WASGD" if tau != 0.0 else "ASGD")
@@ -23,19 +29,22 @@ class WASGD(BaseOptimizer):
         self.c_nu = c_mu
         self.tau = tau
         self.add_iter_lr = add_iter_lr  # Dont start at 0 to avoid large learning rates at the beginning
+        self.device = device
+        if device is None:
+            self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    def reset(self, initial_theta: np.ndarray):
+    def reset(self, initial_theta: torch.Tensor):
         """
         Reset the optimizer state
         """
         self.iter = 0
-        self.theta_not_averaged = np.copy(initial_theta)
+        self.theta_not_averaged = initial_theta.clone().to(self.device)
         self.sum_weights = 0
 
     def step(
         self,
-        data: np.ndarray | Tuple[np.ndarray, np.ndarray],
-        theta: np.ndarray,
+        data: torch.Tensor | Tuple[torch.Tensor, torch.Tensor],
+        theta: torch.Tensor,
         g: BaseObjectiveFunction,
     ):
         """
@@ -46,6 +55,6 @@ class WASGD(BaseOptimizer):
         learning_rate = self.c_nu * ((self.iter + self.add_iter_lr) ** (-self.nu))
         self.theta_not_averaged += -learning_rate * grad
 
-        weight = np.log(self.iter + 1) ** self.tau
+        weight = math.log(self.iter + 1) ** self.tau
         self.sum_weights += weight
         theta += (self.theta_not_averaged - theta) * weight / self.sum_weights

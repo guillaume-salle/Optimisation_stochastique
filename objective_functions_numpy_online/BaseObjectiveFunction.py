@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
+from typing import Tuple
 import numpy as np
-from typing import Tuple, Any
 
 
 class BaseObjectiveFunction(ABC):
@@ -9,23 +9,29 @@ class BaseObjectiveFunction(ABC):
     """
 
     @abstractmethod
-    def __call__(self, X: Any, h: np.ndarray) -> np.ndarray:
+    def __call__(
+        self, X: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+    ) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
-    def get_theta_dim(self, X: Any) -> int:
+    def get_theta_dim(self, X: np.ndarray | Tuple[np.ndarray, np.ndarray]) -> int:
         raise NotImplementedError
 
     @abstractmethod
-    def grad(self, X: Any, h: np.ndarray) -> np.ndarray:
+    def grad(
+        self, X: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+    ) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
-    def grad_and_hessian(self, X: Any, h: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    def grad_and_hessian(
+        self, X: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
     def grad_and_riccati(
-        self, X: Any, h: np.ndarray, iter: int
+        self, X: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError(
             "Riccati is not implemented for this objective function"

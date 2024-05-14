@@ -1,23 +1,23 @@
 import numpy as np
+from typing import Generator, Tuple, Optional
 from torch.utils.data import Dataset
 
 
 class MyDataset(Dataset):
-    def __init__(self, X, Y=None, name=None):
+    def __init__(self, X: np.ndarray, Y: Optional[np.ndarray] = None):
         """
         Initialize the dataset.
 
         Parameters:
         X (np.ndarray): Features of the dataset.
         Y (np.ndarray, optional): Labels of the dataset. If None, the dataset consists only of features.
-        name (str, optional): Name of the dataset.
         """
         self.X = X
         self.Y = Y
-        if name is not None:
-            self.name = name
 
-    def __iter__(self):
+    def __iter__(
+        self,
+    ) -> Generator[Tuple[np.ndarray, np.ndarray] | np.ndarray, None, None]:
         """
         Make the dataset iterable, yielding either (x, y) tuples or just x depending on the presence of Y.
         """
@@ -28,13 +28,13 @@ class MyDataset(Dataset):
             for x in self.X:
                 yield x
 
-    def __len__(self):
+    def __len__(self) -> int:
         """
         Return the number of samples in the dataset.
         """
         return len(self.X)
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx) -> Tuple[np.ndarray, np.ndarray] | np.ndarray:
         """
         Return the sample at the given index.
 
@@ -48,6 +48,3 @@ class MyDataset(Dataset):
             return (self.X[idx], self.Y[idx])
         else:
             return self.X[idx]
-
-
-# usna streaming: essayer c_nu = d**0.5, d**2/3 et d

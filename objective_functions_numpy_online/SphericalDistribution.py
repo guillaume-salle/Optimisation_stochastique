@@ -1,7 +1,7 @@
 import numpy as np
-from typing import Any, Tuple
+from typing import Tuple
 
-from objective_functions import BaseObjectiveFunction
+from objective_functions_numpy_online import BaseObjectiveFunction
 
 
 class SphericalDistribution(BaseObjectiveFunction):
@@ -11,70 +11,80 @@ class SphericalDistribution(BaseObjectiveFunction):
 
     def __init__(self):
         self.name = "Spherical Distribution"
+        self.atol = 1e-7
 
-    def __call__(self, X: Any, h: np.ndarray) -> np.ndarray:
+    def __call__(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """
+        Compute the objective function over a batch of data
+        """
+        X = data.atleast_2d()
         a = h[:-1]
         b = h[-1]
-        return 0.5 * (np.linalg.norm(X - a) - b) ** 2
+        return 0.5 * (np.linalg.norm(X - a, axis=1) - b) ** 2
 
-    def get_theta_dim(self, X: np.ndarray) -> int:
+    def get_theta_dim(self, data: np.ndarray) -> int:
         """
         Return the dimension of theta
         """
+        X = data
         return X.shape[-1] + 1
 
-    def grad(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
-        a = h[:-1].copy()
+    def grad(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """
+        Compute the gradient of the objective function
+        """
+        X = data
+        a = h[:-1]
         b = h[-1]
-        norm = np.linalg.norm(X - a)
-        grad_a = 0 if norm == 0 else a - X + b * (X - a) / norm
+        diff = X - a
+        norm = np.linalg.norm(diff)
+        grad_a = np.zeros_like(a) if norm < self.atol else (-1 + b / norm) * diff
         grad_b = b - norm
-        return np.append(grad_a, grad_b)
+        grad = np.append(grad_a, grad_b)
+        return grad
 
-    def hessian(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
-        a = h[:-1].copy()
+    def hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """
+        Compute the Hessian of the objective function
+        """
+        X = data
+        d = h.size
+        a = h[:-1]
         b = h[-1]
-        norm = np.linalg.norm(X - a)
-        if norm == 0:
-            return None
-        eye_part = (1 - b / norm) * np.eye(len(a))
-        vector_part = (X - a)[:, None] / norm
-        transpose_vector_part = vector_part.T * norm
-
-        hessian = np.block(
-            [[eye_part, vector_part], [transpose_vector_part, np.array([[1]])]]
+        diff = X - a
+        norm = np.linalg.norm(diff)
+        if norm < self.atol:
+            hessian = np.eye(d)
+            return hessian
+        hessian = np.empty((d, d))
+        hessian[:-1, :-1] = (1 - b / norm) * np.eye(d - 1) + b / norm**3 * np.outer(
+            diff, diff
         )
+        hessian[-1, :-1] = diff / norm
+        hessian[:-1, -1] = diff / norm
+        hessian[-1, -1] = 1
         return hessian
 
     def grad_and_hessian(
-        self, X: np.ndarray, h: np.ndarray
+        self, data: np.ndarray, h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
+        X = data
+        d = h.size
         a = h[:-1].copy()
         b = h[-1]
+        diff = X - a
         norm = np.linalg.norm(X - a)
-        if norm == 0:
-            return np.array([0, b]), None
-        else:
-            grad = np.concatenate([a - X + b * (X - a) / norm, np.array([b - norm])])
-            # eye_part = (1 - b / norm) * np.eye(len(a)) + (b / norm**3) * np.outer(
-            #     X - a, X - a
-            # )
-            # matrix = (X-a) @ (X-a).T
-            # assert matrix.shape == (len(a), len(a))
-            # eye_part = (1 - b / norm) * np.eye(len(a)) + (b / norm**3) * matrix
-            # vector_part = (X - a)[:, np.newaxis] / norm
-            # scalar_part = np.array([[1]])
-            # top_right = vector_part
-            # bottom_left = vector_part.T
-
-            # hessian = np.block([[eye_part, top_right], [bottom_left, scalar_part]])
-            # return grad, hessian
-
-            hessian = np.zeros((len(a) + 1, len(a) + 1))
-            matrix = np.outer(X - a, X - a)
-            assert matrix.shape == (len(a), len(a))
-            hessian[:-1, :-1] = (1 - b / norm) * np.eye(len(a)) + b / norm**3 * matrix
-            hessian[-1, :-1] = (X - a) / norm
-            hessian[:-1, -1] = (X - a) / norm
-            hessian[-1, -1] = 1
+        grad_a = np.zeros_like(a) if norm < self.atol else (-1 + b / norm) * diff
+        grad_b = b - norm
+        grad = np.append(grad_a, grad_b)
+        if norm < self.atol:
+            hessian = np.eye(d)
             return grad, hessian
+        hessian = np.empty((d, d))
+        hessian[:-1, :-1] = (1 - b / norm) * np.eye(d - 1) + b / norm**3 * np.outer(
+            diff, diff
+        )
+        hessian[-1, :-1] = diff / norm
+        hessian[:-1, -1] = diff / norm
+        hessian[-1, -1] = 1
+        return grad, hessian
