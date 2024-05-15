@@ -1,7 +1,11 @@
 import numpy as np
 from typing import Tuple
 
-from objective_functions_numpy_online import BaseObjectiveFunction, add_bias
+from objective_functions_numpy_online import (
+    BaseObjectiveFunction,
+    add_bias,
+    add_bias_1d,
+)
 
 
 class LinearRegression(BaseObjectiveFunction):
@@ -20,9 +24,11 @@ class LinearRegression(BaseObjectiveFunction):
         Compute the linear regression loss, works with a batch or a single data point
         """
         X, y = data
-        X = np.atleast_2d(X)
         if self.bias:
-            X = add_bias(X)
+            if X.ndim == 1:
+                X = add_bias_1d(X)
+            else:
+                X = add_bias(X)
         Y_pred = np.dot(X, theta)
         return 0.5 * (Y_pred - y) ** 2
 
@@ -43,8 +49,9 @@ class LinearRegression(BaseObjectiveFunction):
         Compute the gradient of the linear regression loss, works only for a single data point
         """
         X, y = data
+        X = X.squeeze()
         if self.bias:
-            X = add_bias(X)
+            X = add_bias_1d(X)
         Y_pred = np.dot(X, theta)
         grad = (Y_pred - y) * X
         return grad
@@ -56,8 +63,9 @@ class LinearRegression(BaseObjectiveFunction):
         Compute the Hessian of the linear regression loss, works only for a single data point
         """
         X, _ = data
+        X = X.squeeze()
         if self.bias:
-            X = add_bias(X)
+            X = add_bias_1d(X)
         return np.outer(X, X)
 
     def grad_and_hessian(
@@ -67,8 +75,9 @@ class LinearRegression(BaseObjectiveFunction):
         Compute the gradient and the Hessian of the linear regression loss, works only for a single data point
         """
         X, y = data
+        X = X.squeeze()
         if self.bias:
-            X = add_bias(X)
+            X = add_bias_1d(X)
         Y_pred = np.dot(X, theta)
         grad = (Y_pred - y) * X
         hessian = np.outer(X, X)
@@ -81,8 +90,9 @@ class LinearRegression(BaseObjectiveFunction):
         Compute the gradient and the Riccati of the linear regression loss, works only for a single data point
         """
         X, y = data
+        X = X.squeeze()
         if self.bias:
-            X = add_bias(X)
+            X = add_bias_1d(X)
         Y_pred = np.dot(X, theta)
         grad = (Y_pred - y) * X
         riccati = X

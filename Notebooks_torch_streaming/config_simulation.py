@@ -17,6 +17,8 @@ from datasets_torch import (
     covtype,
 )
 
+LIBRARY_ALGORITHMS = "algorithms_torch"
+LIBRARY_OBJECTIVE_FUNCTIONS = "objective_functions_torch_streaming"
 
 # Configuration for the number of runs and size of data
 N = 10
@@ -26,11 +28,10 @@ batch_size = 1
 batch_size = 1  # Online setting
 
 # Configuration for true theta
-true_theta = torch.tensor(
-    [0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0]
-)  # Article, set bias=True
-# true_theta = torch.tensor([-2., -1., 0., 1., 2.])            # Slides, bias=False
-# true_theta = torch.tensor([1, 1, 1, 1, 1])                   # Poly, bias=False
+# Value from the article:
+true_theta = torch.tensor([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
+# true_theta = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0])  # Slides, bias=False
+# true_theta = torch.tensor([1, 1, 1, 1, 1])  # Poly, bias=False
 
 # Whether or not a bias term is included
 bias_setting = True
@@ -100,19 +101,3 @@ eval_covtype = partial(
     initial_theta=torch.zeros(54 + 1),
     e_values=None,
 )
-
-simulations = [
-    simulation_linear_regression,
-    simulation_logistic_regression,
-    simulation_geometric_median,
-    simulation_spherical_distribution,
-    simulation_p_means,
-]
-
-simulations_with_riccati = [
-    simulation_linear_regression,
-    simulation_logistic_regression,
-    simulation_geometric_median,
-]
-
-evaluations = [eval_covtype]

@@ -1,4 +1,4 @@
-from .Dataset import MyDataset
+from .MyDataset import MyDataset
 from .generate_logistic_regression import generate_logistic_regression
 from .generate_linear_regression import generate_linear_regression
 from .generate_geometric_median import generate_geometric_median

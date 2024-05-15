@@ -16,14 +16,14 @@ class USNA(BaseOptimizer):
         c_nu: float = 1.0,  # Set to 1.0 in the article
         gamma: float = 0.75,  # Set to 0.75 in the article
         c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
-        generate_Z: str = "normal",
-        add_iter_lr: int = 20,
+        generate_Z: str = "canonic",
+        add_iter_lr: int = 200,  # Works better
     ):
         self.name = (
             "USNA"
-            + (f" ν={nu}" if nu != 1.0 else "")
+            + (f" ν={nu}")
             + (f" γ={gamma}")
-            + (" Z~" + generate_Z if generate_Z != "normal" else "")
+            + (" Z~" + generate_Z if generate_Z != "canonic" else "")
         )
         self.nu = nu
         self.c_nu = c_nu

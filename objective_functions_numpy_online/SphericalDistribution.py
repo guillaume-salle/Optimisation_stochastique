@@ -17,23 +17,26 @@ class SphericalDistribution(BaseObjectiveFunction):
         """
         Compute the objective function over a batch of data
         """
-        X = data.atleast_2d()
+        X = data
         a = h[:-1]
         b = h[-1]
-        return 0.5 * (np.linalg.norm(X - a, axis=1) - b) ** 2
+        if X.ndim == 1:
+            return 0.5 * (np.linalg.norm(X - a) - b) ** 2
+        else:
+            return 0.5 * (np.linalg.norm(X - a, axis=1) - b) ** 2
 
     def get_theta_dim(self, data: np.ndarray) -> int:
         """
         Return the dimension of theta
         """
-        X = data
+        X = data.squeeze()
         return X.shape[-1] + 1
 
     def grad(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
         Compute the gradient of the objective function
         """
-        X = data
+        X = data.squeeze()
         a = h[:-1]
         b = h[-1]
         diff = X - a
@@ -47,7 +50,7 @@ class SphericalDistribution(BaseObjectiveFunction):
         """
         Compute the Hessian of the objective function
         """
-        X = data
+        X = data.squeeze()
         d = h.size
         a = h[:-1]
         b = h[-1]
@@ -68,7 +71,7 @@ class SphericalDistribution(BaseObjectiveFunction):
     def grad_and_hessian(
         self, data: np.ndarray, h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        X = data
+        X = data.squeeze()
         d = h.size
         a = h[:-1].copy()
         b = h[-1]

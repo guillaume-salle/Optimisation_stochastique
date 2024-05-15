@@ -23,7 +23,7 @@ class USNA(BaseOptimizer):
     ):
         self.name = (
             "USNA"
-            + (f" ν={nu}" if nu != 1.0 else "")
+            + (f" ν={nu}")
             + (f" γ={gamma}")
             + (" Z~" + generate_Z if generate_Z != "normal" else "")
         )

@@ -22,7 +22,7 @@ class WASGD(BaseOptimizer):
     ):
         self.name = (
             ("WASGD" if tau != 0.0 else "ASGD")
-            + (f" ν={nu}" if nu != 1.0 else "")
+            + (f" ν={nu}")
             + (f" τ={tau}" if tau != 2.0 and tau != 0.0 else "")
         )
         self.nu = nu

@@ -9,6 +9,7 @@ from itertools import cycle
 
 import torch
 from torch.utils.data import Dataset, DataLoader
+from datasets_numpy import MyDataset
 
 from algorithms_torch import BaseOptimizer
 from objective_functions_torch_streaming import BaseObjectiveFunction
@@ -24,14 +25,16 @@ class Simulation:
         self,
         g: BaseObjectiveFunction,
         optimizer_list: List[BaseOptimizer],
-        dataset: Dataset = None,
-        test_dataset: Dataset = None,
+        batch_size: int | str,
+        dataset: Dataset | MyDataset = None,
+        test_dataset: Dataset | MyDataset = None,
         generate_dataset: Callable = None,
         dataset_name: str = None,
-        true_theta: torch.Tensor = None,
-        true_hessian_inv: torch.Tensor = None,
-        initial_theta: torch.Tensor = None,
+        true_theta: np.ndarray | torch.Tensor = None,
+        true_hessian_inv: np.ndarray | torch.Tensor = None,
+        initial_theta: np.ndarray | torch.Tensor = None,
         e_values: List[float] = [1.0, 2.0],
+        use_torch: bool = False,
         device: str = None,
     ):
         """
@@ -44,6 +47,7 @@ class Simulation:
         self.true_hessian_inv = true_hessian_inv
         self.g = g
         self.optimizer_list = optimizer_list
+        self.batch_size = batch_size
         self.dataset = dataset
         self.test_dataset = test_dataset
         self.generate_dataset = generate_dataset
@@ -51,14 +55,32 @@ class Simulation:
         self.true_theta = true_theta
         self.true_hessian_inv = true_hessian_inv
         # If true values are not provided, set the logging function to None
-        if true_theta is None and true_hessian_inv is None:
+        if true_theta is None:
             self.logging_estimation_error = lambda *args: None
+        elif use_torch:
+            self.logging_estimation_error = self.logging_estimation_error_torch
         self.initial_theta = initial_theta
         self.e_values = e_values
-        if device is not None:
+
+        # Set the device for torch tensors
+        self.use_torch = use_torch
+        if use_torch:
             self.device = torch.device(device)
-        else:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            if device is None:
+                self.device = torch.device(
+                    "cuda" if torch.cuda.is_available() else "cpu"
+                )
+            self.g.to(self.device)
+            if self.true_theta is not None:
+                self.true_theta = torch.as_tensor(self.true_theta, device=self.device)
+            if self.true_hessian_inv is not None:
+                self.true_hessian_inv = torch.as_tensor(
+                    self.true_hessian_inv, device=self.device
+                )
+            if self.initial_theta is not None:
+                self.initial_theta = torch.as_tensor(
+                    self.initial_theta, device=self.device
+                )
 
     def generate_initial_theta(self, e: float = 1.0):
         """
@@ -74,14 +96,28 @@ class Simulation:
                 f"true_theta dim ({self.true_theta.size(0)}) does not match the dim of theta ({theta_dim}) for g"
             )
         # Generate the initial theta
-        loc = self.true_theta if self.true_theta is not None else torch.zeros(theta_dim)
-        self.initial_theta = loc + e * torch.randn(theta_dim)
+        loc = self.true_theta if self.true_theta is not None else np.zeros(theta_dim)
+        self.initial_theta = loc + e * np.random.randn(theta_dim)
 
     def logging_estimation_error(
         self, theta_errors: dict, hessian_inv_errors: dict, optimizer
     ):
         """
-        Log the estimation error of theta and hessian inverse
+        Log the estimation error of theta and hessian inverse with numpy arrays
+        """
+        if self.true_theta is not None:
+            diff = self.theta - self.true_theta
+            theta_errors[optimizer.name].append(np.dot(diff, diff))
+        if self.true_hessian_inv is not None and optimizer.hessian_inv is not None:
+            hessian_inv_errors[optimizer.name].append(
+                np.linalg.norm(optimizer.hessian_inv - self.true_hessian_inv, ord="fro")
+            )
+
+    def logging_estimation_error_torch(
+        self, theta_errors: dict, hessian_inv_errors: dict, optimizer
+    ):
+        """
+        Log the estimation error of theta and hessian inverse with torch tensors
         """
         if self.true_theta is not None:
             diff = self.theta - self.true_theta
@@ -93,9 +129,7 @@ class Simulation:
                 ).item()
             )
 
-    def run(
-        self, batch_size: int, pbars: Tuple[tqdm, tqdm] = None
-    ) -> Tuple[dict, dict]:
+    def run(self, pbars: Tuple[tqdm, tqdm] = None) -> Tuple[dict, dict]:
         """
         Run the experiment for a given initial theta, a dataset and a list of optimizers
         """
@@ -103,6 +137,8 @@ class Simulation:
             raise ValueError("initial theta is not set")
         if self.dataset is None:
             raise ValueError("dataset is not set")
+        if self.batch_size == "streaming":
+            self.batch_size = self.initial_theta
 
         # Initialize the directories for errors if true values are provided
         theta_errors = (
@@ -134,20 +170,31 @@ class Simulation:
         for optimizer in self.optimizer_list:
             optimizer.reset(self.initial_theta)
             optimizer_pbar.set_description(optimizer.name)
-            self.theta = self.initial_theta.clone().to(self.device)
+            if self.use_torch:
+                self.theta = self.initial_theta.clone().to(self.device)
+            else:
+                self.theta = self.initial_theta.copy()
 
             # Log initial error
             self.logging_estimation_error(theta_errors, hessian_inv_errors, optimizer)
 
-            # Online pass on the dataset
             data_pbar.reset(total=len(self.dataset))
-            data_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
+
+            # Initialize the data loader
+            if self.use_torch:
+                data_loader = DataLoader(
+                    self.dataset, batch_size=self.batch_size, shuffle=False
+                )
+            else:
+                data_loader = self.dataset.batch_iter(self.batch_size)
+
+            # Run the optimizer on the dataset
             for data in data_loader:
                 optimizer.step(data, self.theta, self.g)
                 self.logging_estimation_error(
                     theta_errors, hessian_inv_errors, optimizer
                 )
-                data_pbar.update(batch_size)
+                data_pbar.update(self.batch_size)
             optimizer_pbar.update(1)
 
             # Calculate and store accuracies if test dataset is provided
@@ -163,13 +210,11 @@ class Simulation:
                     "Test Accuracy": test_acc,
                 }
 
-            # Convert errors to torch tensors for averaging
+            # Convert errors to numpy arrays for averaging
             if theta_errors is not None:
-                theta_errors[optimizer.name] = torch.tensor(
-                    theta_errors[optimizer.name]
-                )
+                theta_errors[optimizer.name] = np.array(theta_errors[optimizer.name])
             if hessian_inv_errors is not None:
-                hessian_inv_errors[optimizer.name] = torch.tensor(
+                hessian_inv_errors[optimizer.name] = np.array(
                     hessian_inv_errors[optimizer.name]
                 )
 
@@ -188,7 +233,7 @@ class Simulation:
 
         return theta_errors, hessian_inv_errors
 
-    def run_multiple_datasets(self, N: int = 100, n: int = 10_000, batch_size: int = 1):
+    def run_multiple_datasets(self, N: int = 100, n: int = 10_000):
         """
         Run the experiment multiple times by generating a new dataset and initial theta each time
         """
@@ -207,13 +252,10 @@ class Simulation:
 
         for e in self.e_values:
             self.theta_errors_avg = {
-                optimizer.name: torch.zeros(n + 1) for optimizer in self.optimizer_list
+                optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list
             }
             self.hessian_inv_errors_avg = (
-                {
-                    optimizer.name: torch.zeros(n + 1)
-                    for optimizer in self.optimizer_list
-                }
+                {optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list}
                 if self.true_hessian_inv is not None
                 else None
             )
@@ -227,7 +269,7 @@ class Simulation:
                 )
                 self.generate_initial_theta(e=e)
                 theta_errors, hessian_inv_errors = self.run(
-                    batch_size, pbars=[optimizer_pbar, data_pbar]
+                    pbars=[optimizer_pbar, data_pbar]
                 )
 
                 for name, errors in theta_errors.items():
@@ -287,11 +329,15 @@ class Simulation:
             ax.set_title(f"e={e}")
             ax.legend(loc="lower left")
 
+        # Adjust layout to provide space for ylabel
+        fig.subplots_adjust(left=0.1)
         average = f"Average over {N} run" + ("s" if N > 1 else "")
-        fig.text(0.04, 0.5, ylabel + average, va="center", rotation="vertical")
+        fig.text(0.0, 0.5, ylabel + average, va="center", rotation="vertical")
 
-        plt.suptitle(self.g.name + ", " + str(self.dataset_name) + " dataset")
-        plt.tight_layout()
+        plt.suptitle(
+            f"{self.g.name}, {self.dataset_name} dataset, batch size={self.batch_size}"
+        )
+        plt.tight_layout(pad=3.0)
         plt.show()
 
     def plot_all_errors(

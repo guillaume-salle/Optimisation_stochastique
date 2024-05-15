@@ -14,20 +14,28 @@ class GeometricMedian(BaseObjectiveFunction):
         self.name = "Geometric median"
         self.atol = 1e-7
 
-    def __call__(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
-        X = np.atleast_2d(X)
-        return np.linalg.norm(X - h, axis=1) - np.linalg.norm(X, axis=1)
+    def __call__(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+        """
+        Compute the objective function, works for a single point or a batch of points
+        """
+        X = data
+        if X.ndim == 1:
+            return np.linalg.norm(X - h) - np.linalg.norm(X)
+        else:
+            return np.linalg.norm(X - h, axis=1) - np.linalg.norm(X, axis=1)
 
-    def get_theta_dim(self, X: np.ndarray) -> int:
+    def get_theta_dim(self, data: np.ndarray) -> int:
         """
         Return the dimension of theta
         """
+        X = data
         return X.shape[-1]
 
-    def grad(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
+    def grad(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
         Compute the gradient of the objective function, returns 0 if h is close to X
         """
+        X = data.squeeze()
         diff = h - X
         norm = np.linalg.norm(diff)
         if norm < self.atol:
@@ -35,10 +43,11 @@ class GeometricMedian(BaseObjectiveFunction):
         else:
             return diff / norm
 
-    def hessian(self, X: np.ndarray, h: np.ndarray) -> np.ndarray:
+    def hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
         Compute the Hessian of the objective function, returns Id if h is close to X
         """
+        X = data.squeeze()
         d = h.shape[0]
         diff = h - X
         norm = np.linalg.norm(diff)
@@ -48,11 +57,12 @@ class GeometricMedian(BaseObjectiveFunction):
             return (np.eye(d) - np.outer(diff, diff) / norm**2) / norm
 
     def grad_and_hessian(
-        self, X: np.ndarray, h: np.ndarray
+        self, data: np.ndarray, h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Hessian of the objective function
         """
+        X = data.squeeze()
         d = h.shape[0]
         diff = h - X
         norm = np.linalg.norm(diff)
@@ -64,11 +74,12 @@ class GeometricMedian(BaseObjectiveFunction):
             return grad, hessian
 
     def grad_and_riccati(
-        self, X: np.ndarray, h: np.ndarray, iter: int
+        self, data: np.ndarray, h: np.ndarray, iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and riccati term of the objective function
         """
+        X = data.squeeze()
         d = h.shape[0]
         diff = h - X
         norm = np.linalg.norm(diff)

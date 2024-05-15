@@ -1,12 +1,20 @@
 import numpy as np
+import torch
 from typing import List, Tuple
 from datasets_numpy import MyDataset
 
 
-def sigmoid_array(z: np.ndarray) -> np.ndarray:
-    """Compute the sigmoid function in a stable way for arrays."""
-    sigmoid = np.where(z >= 0, 1 / (1 + np.exp(-z)), np.exp(z) / (1 + np.exp(z)))
-    return sigmoid
+def sigmoid_torch(z: np.ndarray) -> np.ndarray:
+    """
+    Numerically stable sigmoid function using PyTorch.
+
+    Parameters:
+    z (np.ndarray): Input array.
+
+    Returns:
+    np.ndarray: Sigmoid of input array.
+    """
+    return torch.sigmoid(torch.as_tensor(z)).numpy()
 
 
 def generate_logistic_regression(
@@ -15,7 +23,7 @@ def generate_logistic_regression(
     """
     Generate data from a linear regression model.
     """
-    name = "linear regression"
+    name = "logistic regression"
 
     d = len(true_theta)
     if bias:
@@ -25,6 +33,6 @@ def generate_logistic_regression(
         X = np.random.randn(n, d)
         phi = X
 
-    Y = np.random.binomial(1, sigmoid_array(phi @ true_theta))
+    Y = np.random.binomial(1, sigmoid_torch(phi @ true_theta))
 
     return MyDataset(X=X, Y=Y), name

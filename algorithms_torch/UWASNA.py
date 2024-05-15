@@ -26,7 +26,7 @@ class UWASNA(BaseOptimizer):
     ):
         self.name = (
             ("UWASNA" if tau_theta != 0.0 or tau_hessian != 0.0 else "USNA")
-            + (f" ν={nu}" if nu != 1.0 else "")
+            + (f" ν={nu}")
             + (f" γ={gamma}")
             + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
             + (

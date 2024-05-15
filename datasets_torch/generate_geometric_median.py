@@ -1,7 +1,7 @@
 import torch
 from torch.distributions import MultivariateNormal
 from torch.utils.data import TensorDataset
-from typing import List
+from typing import List, Tuple
 
 
 def generate_covariance_matrix(d, eigenvalues) -> torch.Tensor:

@@ -13,15 +13,19 @@ class WASGD(BaseOptimizer):
     """
 
     def __init__(
-        self, nu: float, c_mu: float = 1.0, tau: float = 2.0, add_iter_lr: int = 20
+        self,
+        nu: float = 0.75,
+        c_nu: float = 5.0,
+        tau: float = 2.0,
+        add_iter_lr: int = 200,
     ):
         self.name = (
             ("WASGD" if tau != 0.0 else "ASGD")
-            + (f" ν={nu}" if nu != 1.0 else "")
-            + (f" τ={tau}" if tau != 2.0 and tau != 0.0 else "")
+            + (f" ν={nu}")
+            + (f" τ={tau}" if tau != 0.0 and tau != 2.0 else "")
         )
         self.nu = nu
-        self.c_nu = c_mu
+        self.c_nu = c_nu
         self.tau = tau
         self.add_iter_lr = add_iter_lr  # Dont start at 0 to avoid large learning rates at the beginning
 

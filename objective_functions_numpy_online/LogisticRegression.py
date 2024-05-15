@@ -1,7 +1,12 @@
 import numpy as np
+import torch
 from typing import Tuple
 
-from objective_functions_numpy_online import BaseObjectiveFunction, add_bias
+from objective_functions_numpy_online import (
+    BaseObjectiveFunction,
+    add_bias,
+    add_bias_1d,
+)
 from datasets_numpy import MyDataset
 
 
@@ -13,10 +18,17 @@ def sigmoid(z: float):
         return np.exp(z) / (1 + np.exp(z))
 
 
-def sigmoid_array(z: np.ndarray) -> np.ndarray:
-    """Compute the sigmoid function in a stable way for arrays."""
-    sigmoid = np.where(z >= 0, 1 / (1 + np.exp(-z)), np.exp(z) / (1 + np.exp(z)))
-    return sigmoid
+def sigmoid_torch(z: np.ndarray) -> np.ndarray:
+    """
+    Numerically stable sigmoid function using PyTorch.
+
+    Parameters:
+    z (np.ndarray): Input array.
+
+    Returns:
+    np.ndarray: Sigmoid of input array.
+    """
+    return torch.sigmoid(torch.as_tensor(z)).numpy()
 
 
 class LogisticRegression(BaseObjectiveFunction):
@@ -35,9 +47,11 @@ class LogisticRegression(BaseObjectiveFunction):
         Compute the logistic loss, works with a batch or a single data point
         """
         X, y = data
-        X = np.atleast_2d(X)
         if self.bias:
-            X = add_bias(X)
+            if X.ndim == 1:
+                X = add_bias_1d(X)
+            else:
+                X = add_bias(X)
         dot_product = np.dot(X, h)
         return np.log(1 + np.exp(dot_product)) - dot_product * y
 
@@ -57,7 +71,7 @@ class LogisticRegression(BaseObjectiveFunction):
             if self.bias:
                 X_batch = add_bias(X_batch)
             dot_product = np.dot(X_batch, h)
-            p = sigmoid_array(dot_product)
+            p = sigmoid_torch(dot_product)
             predictions = (p > 0.5).astype(int)
             correct_predictions += np.sum(predictions == Y_batch)
             total += Y_batch.shape[0]
@@ -79,8 +93,9 @@ class LogisticRegression(BaseObjectiveFunction):
         Compute the gradient of the logistic loss, works only for a single data point
         """
         X, y = data
+        X = X.squeeze()
         if self.bias:
-            X = add_bias(X)
+            X = add_bias_1d(X)
         dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
         grad = (p - y) * X
@@ -91,8 +106,9 @@ class LogisticRegression(BaseObjectiveFunction):
         Compute the Hessian of the logistic loss, works only for a single data point
         """
         X, _ = data
+        X = X.squeeze()
         if self.bias:
-            X = add_bias(X)
+            X = add_bias_1d(X)
         dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
         hessian = p * (1 - p) * np.outer(X, X)
@@ -106,8 +122,9 @@ class LogisticRegression(BaseObjectiveFunction):
         Does not work for a batch of data because of the outer product
         """
         X, y = data
+        X = X.squeeze()
         if self.bias:
-            X = add_bias(X)
+            X = add_bias_1d(X)
         dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
         grad = (p - y) * X
@@ -122,8 +139,9 @@ class LogisticRegression(BaseObjectiveFunction):
         Does not work for a batch of data because of the outer product
         """
         X, y = data
+        X = X.squeeze()
         if self.bias:
-            X = add_bias(X)
+            X = add_bias_1d(X)
         dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
         grad = (p - y) * X

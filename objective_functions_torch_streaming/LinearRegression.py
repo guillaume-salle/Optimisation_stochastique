@@ -1,7 +1,11 @@
 import torch
 from typing import Tuple
 
-from objective_functions_torch_streaming import BaseObjectiveFunction, add_bias
+from objective_functions_torch_streaming import (
+    BaseObjectiveFunction,
+    add_bias,
+    add_bias_1d,
+)
 
 
 class LinearRegression(BaseObjectiveFunction):
@@ -20,9 +24,11 @@ class LinearRegression(BaseObjectiveFunction):
         Compute the linear regression loss, works with a batch or a single data point
         """
         X, y = data
-        X = torch.atleast_2d(X)
         if self.bias:
-            X = add_bias(X)
+            if X.ndim == 1:
+                X = add_bias_1d(X)
+            else:
+                X = add_bias(X)
         Y_pred = torch.einsum("ni,i->n", X, h)
         return 0.5 * (Y_pred - y) ** 2
 

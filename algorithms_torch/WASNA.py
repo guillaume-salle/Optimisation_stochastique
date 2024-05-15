@@ -22,7 +22,7 @@ class WASNA(BaseOptimizer):
     ):
         self.name = (
             ("WASNA" if tau_theta != 0.0 else "SNA*")
-            + (f" ν={nu}" if nu != 1.0 else "")
+            + (f" ν={nu}")
             + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
         )
         self.nu = nu

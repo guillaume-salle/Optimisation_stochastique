@@ -12,7 +12,7 @@ class SNA(BaseOptimizer):
 
     def __init__(
         self,
-        nu: float,
+        nu: float = 1.0,
         c_nu: float = 1.0,
         add_iter_lr: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d

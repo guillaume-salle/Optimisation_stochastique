@@ -1,6 +1,7 @@
 import torch
 import math
-from typing import Any, Tuple
+import random
+from typing import Tuple
 
 from objective_functions_torch_streaming import BaseObjectiveFunction
 
@@ -28,7 +29,7 @@ class GeometricMedian(BaseObjectiveFunction):
     def grad(self, data: Tuple[torch.Tensor], h: torch.Tensor) -> torch.Tensor:
         """
         Compute the gradient of the objective function, returns 0 if h is close to X
-        sum over the batch and normalize by the batch size
+        average over the batch
         """
         X = data[0]
         n = X.size(0)
@@ -39,13 +40,13 @@ class GeometricMedian(BaseObjectiveFunction):
             torch.ones_like(norm),
             1 / norm,
         )
-        grad = torch.einsum("n,ni->i", safe_inv_norm, diff)
-        return grad / n
+        grad = torch.einsum("n,ni->i", safe_inv_norm, diff) / n
+        return grad
 
     def hessian(self, data: Tuple[torch.Tensor], h: torch.Tensor) -> torch.Tensor:
         """
         Compute the Hessian of the objective function, returns Id if h is close to X
-        sum over the batch and normalize by the batch size
+        average over the batch
         """
         X = data[0]
         n, d = X.size()
@@ -78,11 +79,11 @@ class GeometricMedian(BaseObjectiveFunction):
             torch.ones_like(norm),
             1 / norm,
         )
-        grad = torch.einsum("n,ni->i", safe_inv_norm, diff)
+        grad = torch.einsum("n,ni->i", safe_inv_norm, diff) / n
         hessian = torch.eye(d) * torch.mean(safe_inv_norm) - torch.einsum(
             "n,ni,nj->ij", safe_inv_norm**3 / n, diff, diff
         )
-        return grad / n, hessian
+        return grad, hessian
 
     def grad_and_riccati(
         self, data: Tuple[torch.Tensor], h: torch.Tensor, iter: int
@@ -99,7 +100,12 @@ class GeometricMedian(BaseObjectiveFunction):
         diff = h - X
         norm = torch.norm(diff)
         if norm < self.atol:
-            return torch.zeros_like(h), torch.zeros_like(h)
+            # Randomly select a direction for the Riccati term, so the outer product
+            # average to the identity matrix
+            z = random.randint(0, d - 1)
+            ricatti = torch.zeros(d)
+            ricatti[z] = 1
+            return torch.zeros_like(h), riccati
         grad = diff / norm
         Z = torch.randn(d)
         alpha = 1 / (iter * math.log(iter + 1))
