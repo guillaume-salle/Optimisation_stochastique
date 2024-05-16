@@ -1,4 +1,5 @@
 import numpy as np
+import math
 import torch
 from typing import Tuple
 
@@ -13,9 +14,9 @@ from datasets_numpy import MyDataset
 def sigmoid(z: float):
     """Stable sigmoid function that avoids overflow."""
     if z >= 0:
-        return 1 / (1 + np.exp(-z))
+        return 1 / (1 + math.exp(-z))
     else:
-        return np.exp(z) / (1 + np.exp(z))
+        return math.exp(z) / (1 + math.exp(z))
 
 
 def sigmoid_torch(z: np.ndarray) -> np.ndarray:

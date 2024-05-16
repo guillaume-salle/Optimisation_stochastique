@@ -44,7 +44,7 @@ class SphericalDistribution(BaseObjectiveFunction):
             torch.ones_like(norm),
             1 / norm,
         )
-        grad_a = torch.einsum("n,ni->i", (-1 + b * safe_inv_norm) / n, diff)
+        grad_a = torch.matmul(-1 + b * safe_inv_norm, diff) / n
         grad_b = b - torch.mean(norm, keepdim=True)
         grad = torch.cat([grad_a, grad_b])
         return grad

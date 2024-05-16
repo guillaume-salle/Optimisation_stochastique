@@ -1,7 +1,7 @@
 import numpy as np
 from typing import Tuple
 
-from objective_functions_numpy_online import (
+from objective_functions_numpy_streaming import (
     BaseObjectiveFunction,
     add_bias,
     add_bias_1d,
@@ -46,50 +46,56 @@ class LinearRegression(BaseObjectiveFunction):
         self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
     ) -> np.ndarray:
         """
-        Compute the gradient of the linear regression loss, works only for a single data point
+        Compute the gradient of the linear regression loss, average over the batch
         """
         X, y = data
-        X = X.squeeze()
+        n = X.shape[0]
         if self.bias:
-            X = add_bias_1d(X)
+            X = add_bias(X)
         Y_pred = np.dot(X, theta)
-        grad = (Y_pred - y) * X
+        grad = np.dot(X.T, Y_pred - y) / n
         return grad
 
     def hessian(
         self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
     ) -> np.ndarray:
         """
-        Compute the Hessian of the linear regression loss, works only for a single data point
+        Compute the Hessian of the linear regression loss, average over the batch
         """
         X, _ = data
-        X = X.squeeze()
+        n = X.shape[0]
         if self.bias:
-            X = add_bias_1d(X)
-        return np.outer(X, X)
+            X = add_bias(X)
+        hessian = np.einsum("ni,nj->ij", X / n, X)
+        return hessian
 
     def grad_and_hessian(
         self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Hessian of the linear regression loss, works only for a single data point
+        Compute the gradient and the Hessian of the linear regression loss,
+        average over the batch
         """
         X, y = data
-        X = X.squeeze()
+        n = X.shape[0]
         if self.bias:
-            X = add_bias_1d(X)
+            X = add_bias(X)
         Y_pred = np.dot(X, theta)
-        grad = (Y_pred - y) * X
-        hessian = np.outer(X, X)
+        grad = np.dot(X.T, Y_pred - y) / n
+        hessian = np.einsum("ni,nj->ij", X / n, X)
         return grad, hessian
 
     def grad_and_riccati(
         self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Riccati of the linear regression loss, works only for a single data point
+        Compute the gradient and the Riccati of the linear regression loss,
+        works only for a single data point
         """
         X, y = data
+        n = X.shape[0]
+        if n != 1:
+            raise ValueError("The Riccati term is only defined for a single data point")
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)

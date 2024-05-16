@@ -10,28 +10,28 @@ class BaseObjectiveFunction(ABC):
 
     @abstractmethod
     def __call__(
-        self, X: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
-    def get_theta_dim(self, X: np.ndarray | Tuple[np.ndarray, np.ndarray]) -> int:
+    def get_theta_dim(self, data: np.ndarray | Tuple[np.ndarray, np.ndarray]) -> int:
         raise NotImplementedError
 
     @abstractmethod
     def grad(
-        self, X: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
     def grad_and_hessian(
-        self, X: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
     def grad_and_riccati(
-        self, X: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError(
             "Riccati is not implemented for this objective function"

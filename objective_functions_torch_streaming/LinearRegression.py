@@ -29,7 +29,7 @@ class LinearRegression(BaseObjectiveFunction):
                 X = add_bias_1d(X)
             else:
                 X = add_bias(X)
-        Y_pred = torch.einsum("ni,i->n", X, h)
+        Y_pred = torch.matmul(X, h)
         return 0.5 * (Y_pred - y) ** 2
 
     def get_theta_dim(self, data: Tuple) -> int:
@@ -44,15 +44,14 @@ class LinearRegression(BaseObjectiveFunction):
 
     def grad(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
         """
-        Compute the gradient of the linear regression loss,
-        sum over the batch and normalize by the batch size
+        Compute the gradient of the linear regression loss, average over the batch
         """
         X, y = data
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        Y_pred = torch.einsum("ni,i->n", X, h)
-        grad = torch.einsum("n,ni->i", Y_pred - y, X) / n
+        Y_pred = torch.matmul(X, h)
+        grad = torch.matmul(Y_pred - y, X) / n
         return grad
 
     def hessian(self, data: Tuple, h: torch.Tensor) -> torch.Tensor:
@@ -64,7 +63,7 @@ class LinearRegression(BaseObjectiveFunction):
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        hessian = torch.einsum("ni,nj->ij", X, X) / n
+        hessian = torch.einsum("ni,nj->ij", X / n, X)
         return hessian
 
     def grad_and_hessian(
@@ -78,9 +77,9 @@ class LinearRegression(BaseObjectiveFunction):
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        Y_pred = torch.einsum("ni,i->n", X, h)
-        grad = torch.einsum("n,ni->i", Y_pred - y, X) / n
-        hessian = torch.einsum("nj,nk->jk", X, X) / n
+        Y_pred = torch.matmul(X, h)
+        grad = torch.matmul(Y_pred - y, X) / n
+        hessian = torch.einsum("ni,nj->ij", X / n, X)
         return grad, hessian
 
     def grad_and_riccati(
@@ -94,9 +93,9 @@ class LinearRegression(BaseObjectiveFunction):
         n = X.size(0)
         if n != 1:
             raise ValueError("The Riccati term is only defined for a single data point")
-        if self.bias:
-            X = add_bias(X)
         X = X.squeeze()
+        if self.bias:
+            X = add_bias_1d(X)
         Y_pred = torch.dot(X, h)
         grad = (Y_pred - y) * X
         riccati = X

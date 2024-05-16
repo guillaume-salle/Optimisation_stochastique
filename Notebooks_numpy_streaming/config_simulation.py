@@ -2,7 +2,7 @@ import numpy as np
 from functools import partial
 
 import algorithms_numpy as algorithms
-from objective_functions_numpy_online import (
+from objective_functions_numpy_streaming import (
     LinearRegression,
     LogisticRegression,
     GeometricMedian,

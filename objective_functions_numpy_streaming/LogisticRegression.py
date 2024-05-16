@@ -1,8 +1,9 @@
 import numpy as np
+import math
 import torch
 from typing import Tuple
 
-from objective_functions_numpy_online import (
+from objective_functions_numpy_streaming import (
     BaseObjectiveFunction,
     add_bias,
     add_bias_1d,
@@ -11,16 +12,16 @@ from datasets_numpy import MyDataset
 
 
 def sigmoid(z: float):
-    """Stable sigmoid function that avoids overflow."""
+    """Stable sigmoid function that avoids overflow, works with a single value"""
     if z >= 0:
-        return 1 / (1 + np.exp(-z))
+        return 1 / (1 + math.exp(-z))
     else:
-        return np.exp(z) / (1 + np.exp(z))
+        return math.exp(z) / (1 + math.exp(z))
 
 
-def sigmoid_torch(z: np.ndarray) -> np.ndarray:
+def sigmoid_array(z: np.ndarray) -> np.ndarray:
     """
-    Numerically stable sigmoid function using PyTorch.
+    Numerically stable sigmoid function for array using PyTorch.
 
     Parameters:
     z (np.ndarray): Input array.
@@ -71,7 +72,7 @@ class LogisticRegression(BaseObjectiveFunction):
             if self.bias:
                 X_batch = add_bias(X_batch)
             dot_product = np.dot(X_batch, h)
-            p = sigmoid_torch(dot_product)
+            p = sigmoid_array(dot_product)
             predictions = (p > 0.5).astype(int)
             correct_predictions += np.sum(predictions == Y_batch)
             total += Y_batch.shape[0]
@@ -90,60 +91,62 @@ class LogisticRegression(BaseObjectiveFunction):
 
     def grad(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
         """
-        Compute the gradient of the logistic loss, works only for a single data point
+        Compute the gradient of the logistic loss, average over the batch
         """
         X, y = data
-        X = X.squeeze()
+        n = X.shape[0]
         if self.bias:
-            X = add_bias_1d(X)
+            X = add_bias(X)
         dot_product = np.dot(X, h)
-        p = sigmoid(dot_product)
-        grad = (p - y) * X
+        p = sigmoid_array(dot_product)
+        grad = np.dot(X.T, p - y) / n
         return grad
 
     def hessian(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
         """
-        Compute the Hessian of the logistic loss, works only for a single data point
+        Compute the Hessian of the logistic loss, average over the batch
         """
         X, _ = data
-        X = X.squeeze()
+        n = X.shape[0]
         if self.bias:
-            X = add_bias_1d(X)
+            X = add_bias(X)
         dot_product = np.dot(X, h)
-        p = sigmoid(dot_product)
-        hessian = p * (1 - p) * np.outer(X, X)
+        p = sigmoid_array(dot_product)
+        hessian = np.einsum("n,ni,nj->ij", p * (1 - p) / n, X, X)
         return hessian
 
     def grad_and_hessian(
         self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Hessian of the logistic loss
-        Does not work for a batch of data because of the outer product
+        Compute the gradient and the Hessian of the logistic loss, average over the batch
         """
         X, y = data
-        X = X.squeeze()
+        n = X.shape[0]
         if self.bias:
-            X = add_bias_1d(X)
+            X = add_bias(X)
         dot_product = np.dot(X, h)
-        p = sigmoid(dot_product)
-        grad = (p - y) * X
-        hessian = p * (1 - p) * np.outer(X, X)
+        p = sigmoid_array(dot_product)
+        grad = np.dot(X.T, p - y) / n
+        hessian = np.einsum("n,ni,nj->ij", p * (1 - p) / n, X, X)
         return grad, hessian
 
     def grad_and_riccati(
         self, data: Tuple, h: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Ricatti of the logistic loss
-        Does not work for a batch of data because of the outer product
+        Compute the gradient and the Ricatti of the logistic loss,
+        works only with a batch of size 1
         """
         X, y = data
+        n = X.shape[0]
+        if n != 1:
+            raise ValueError("The Riccati term is only defined for a single data point")
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
         dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
         grad = (p - y) * X
-        ricatti = np.sqrt(p * (1 - p)) * X
+        ricatti = math.sqrt(p * (1 - p)) * X
         return grad, ricatti

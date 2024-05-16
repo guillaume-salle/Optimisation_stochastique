@@ -137,8 +137,11 @@ class Simulation:
             raise ValueError("initial theta is not set")
         if self.dataset is None:
             raise ValueError("dataset is not set")
-        if self.batch_size == "streaming":
-            self.batch_size = self.initial_theta
+        batch_size = (
+            len(self.initial_theta)
+            if self.batch_size == "streaming"
+            else self.batch_size
+        )
 
         # Initialize the directories for errors if true values are provided
         theta_errors = (
@@ -183,10 +186,10 @@ class Simulation:
             # Initialize the data loader
             if self.use_torch:
                 data_loader = DataLoader(
-                    self.dataset, batch_size=self.batch_size, shuffle=False
+                    self.dataset, batch_size=batch_size, shuffle=False
                 )
             else:
-                data_loader = self.dataset.batch_iter(self.batch_size)
+                data_loader = self.dataset.batch_iter(batch_size)
 
             # Run the optimizer on the dataset
             for data in data_loader:
@@ -194,7 +197,7 @@ class Simulation:
                 self.logging_estimation_error(
                     theta_errors, hessian_inv_errors, optimizer
                 )
-                data_pbar.update(self.batch_size)
+                data_pbar.update(batch_size)
             optimizer_pbar.update(1)
 
             # Calculate and store accuracies if test dataset is provided
@@ -252,10 +255,10 @@ class Simulation:
 
         for e in self.e_values:
             self.theta_errors_avg = {
-                optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list
+                optimizer.name: 0.0 for optimizer in self.optimizer_list
             }
             self.hessian_inv_errors_avg = (
-                {optimizer.name: np.zeros(n + 1) for optimizer in self.optimizer_list}
+                {optimizer.name: 0.0 for optimizer in self.optimizer_list}
                 if self.true_hessian_inv is not None
                 else None
             )

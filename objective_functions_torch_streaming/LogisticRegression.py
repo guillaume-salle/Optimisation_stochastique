@@ -1,8 +1,21 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
+import math
 from typing import Tuple
 
-from objective_functions_torch_streaming import BaseObjectiveFunction, add_bias
+from objective_functions_torch_streaming import (
+    BaseObjectiveFunction,
+    add_bias,
+    add_bias_1d,
+)
+
+
+def sigmoid(z: float):
+    """Stable sigmoid function that avoids overflow, works with a single value"""
+    if z >= 0:
+        return 1 / (1 + math.exp(-z))
+    else:
+        return math.exp(z) / (1 + math.exp(z))
 
 
 class LogisticRegression(BaseObjectiveFunction):
@@ -21,10 +34,12 @@ class LogisticRegression(BaseObjectiveFunction):
         Compute the logistic loss, works with a batch or a single data point
         """
         X, y = data
-        X = torch.atleast_2d(X)
         if self.bias:
-            X = add_bias(X)
-        dot_product = torch.einsum("ij,j->i", X, h)
+            if X.ndim == 1:
+                X = add_bias_1d(X)
+            else:
+                X = add_bias(X)
+        dot_product = torch.matmul(X, h)
         return torch.log(1 + torch.exp(dot_product)) - dot_product * y
 
     def evaluate_accuracy(
@@ -40,7 +55,7 @@ class LogisticRegression(BaseObjectiveFunction):
         for X, Y in dataloader:
             if self.bias:
                 X = add_bias(X)
-            dot_product = torch.einsum("ij,j->i", X, h)
+            dot_product = torch.matmul(X, h)
             p = torch.sigmoid(dot_product)
             predictions = (p > 0.5).int()
             correct_predictions += (predictions == Y.int()).sum().item()
@@ -62,38 +77,37 @@ class LogisticRegression(BaseObjectiveFunction):
         self, data: Tuple[torch.Tensor, torch.Tensor], h: torch.Tensor
     ) -> torch.Tensor:
         """
-        Compute the gradient of the logistic loss, sum over the batch and normalize by the batch size
+        Compute the gradient of the logistic loss, average over the batch
         """
         X, Y = data
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        dot_product = torch.einsum("ni,i->n", X, h)
+        dot_product = torch.matmul(X, h)
         p = torch.sigmoid(dot_product)
-        grad = torch.einsum("n,ni->i", p - Y, X) / n
+        grad = torch.matmul(p - Y, X) / n
         return grad
 
     def hessian(
         self, data: Tuple[torch.Tensor, torch.Tensor], h: torch.Tensor
     ) -> torch.Tensor:
         """
-        Compute the Hessian of the logistic loss, sum over the batch and normalize by the batch size
+        Compute the Hessian of the logistic loss, average over the batch
         """
         X, _ = data
         n = X.size(0)
         if self.bias:
             X = add_bias(X)
-        dot_product = torch.einsum("ni,i->n", X, h)
+        dot_product = torch.matmul(X, h)
         p = torch.sigmoid(dot_product)
-        hessian = torch.einsum("n,ni,nj->ij", p * (1 - p), X, X) / n
+        hessian = torch.einsum("n,ni,nj->ij", p * (1 - p) / n, X, X)
         return hessian
 
     def grad_and_hessian(
         self, data: Tuple[torch.Tensor, torch.Tensor], h: torch.Tensor
     ) -> Tuple[torch.Tensor, torch.Tensor]:
         """
-        Compute the gradient and the Hessian of the logistic loss,
-        sum over the batch and normalize by the batch size
+        Compute the gradient and the Hessian of the logistic loss, average over the batch
         """
         X, Y = data
         n = X.size(0)
@@ -115,11 +129,11 @@ class LogisticRegression(BaseObjectiveFunction):
         X, Y = data
         if X.size(0) != 1:
             raise ValueError("The Riccati term is only defined for a single data point")
-        if self.bias:
-            X = add_bias(X)
         X = X.squeeze()
+        if self.bias:
+            X = add_bias_1d(X)
         dot_product = torch.dot(X, h)
-        p = torch.sigmoid(dot_product)
+        p = sigmoid(dot_product)
         grad = (p - Y) * X
-        riccati = torch.sqrt(p * (1 - p)) * X
+        riccati = math.sqrt(p * (1 - p)) * X
         return grad, riccati

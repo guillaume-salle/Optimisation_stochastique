@@ -3,7 +3,7 @@ import math
 import random
 from typing import Tuple
 
-from objective_functions_numpy_online import BaseObjectiveFunction
+from objective_functions_numpy_streaming import BaseObjectiveFunction
 
 
 class GeometricMedian(BaseObjectiveFunction):
@@ -13,7 +13,7 @@ class GeometricMedian(BaseObjectiveFunction):
 
     def __init__(self):
         self.name = "Geometric median"
-        self.atol = 1e-7
+        self.atol = 1e-6
 
     def __call__(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
@@ -46,7 +46,7 @@ class GeometricMedian(BaseObjectiveFunction):
             np.ones_like(norm),
             1 / norm,
         )
-        grad = np.einsum("n,ni->i", safe_inv_norm, diff) / n
+        grad = np.dot(diff.T, safe_inv_norm) / n
         return grad
 
     def hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
@@ -79,13 +79,13 @@ class GeometricMedian(BaseObjectiveFunction):
         X = data
         n, d = X.shape
         diff = h - X
-        norm = np.linalg.norm(diff, dim=1)
+        norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
             np.isclose(norm, np.zeros_like(norm), atol=self.atol),
             np.ones_like(norm),
             1 / norm,
         )
-        grad = np.einsum("n,ni->i", safe_inv_norm, diff) / n
+        grad = np.dot(diff.T, safe_inv_norm) / n
         hessian = np.eye(d) * np.mean(safe_inv_norm) - np.einsum(
             "n,ni,nj->ij", safe_inv_norm**3 / n, diff, diff
         )
