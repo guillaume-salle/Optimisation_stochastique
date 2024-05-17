@@ -1,18 +1,25 @@
 import numpy as np
 import pandas as pd
+import time
+from typing import List, Tuple, Callable
+
+import matplotlib.patches as mpatches
+
+# Imports for visualization
 from IPython.display import display
 import matplotlib.pyplot as plt
-from typing import List, Tuple, Callable
+import seaborn as sns
 from tqdm.auto import tqdm
 from IPython.display import clear_output
 from itertools import cycle
 
 import torch
 from torch.utils.data import Dataset, DataLoader
-from datasets_numpy import MyDataset
 
-from algorithms_torch import BaseOptimizer
-from objective_functions_torch_streaming import BaseObjectiveFunction
+# My imports
+from datasets_numpy import MyDataset
+from algorithms_numpy import BaseOptimizer
+from objective_functions_numpy_streaming import BaseObjectiveFunction
 
 
 class Simulation:
@@ -100,7 +107,10 @@ class Simulation:
         self.initial_theta = loc + e * np.random.randn(theta_dim)
 
     def logging_estimation_error(
-        self, theta_errors: dict, hessian_inv_errors: dict, optimizer
+        self,
+        theta_errors: dict[str, list],
+        hessian_inv_errors: dict[str, list],
+        optimizer,
     ):
         """
         Log the estimation error of theta and hessian inverse with numpy arrays
@@ -108,13 +118,16 @@ class Simulation:
         if self.true_theta is not None:
             diff = self.theta - self.true_theta
             theta_errors[optimizer.name].append(np.dot(diff, diff))
-        if self.true_hessian_inv is not None and optimizer.hessian_inv is not None:
+        if self.true_hessian_inv is not None and hasattr(optimizer, "hessian_inv"):
             hessian_inv_errors[optimizer.name].append(
                 np.linalg.norm(optimizer.hessian_inv - self.true_hessian_inv, ord="fro")
             )
 
     def logging_estimation_error_torch(
-        self, theta_errors: dict, hessian_inv_errors: dict, optimizer
+        self,
+        theta_errors: dict[str, list],
+        hessian_inv_errors: dict[str, list],
+        optimizer,
     ):
         """
         Log the estimation error of theta and hessian inverse with torch tensors
@@ -122,14 +135,16 @@ class Simulation:
         if self.true_theta is not None:
             diff = self.theta - self.true_theta
             theta_errors[optimizer.name].append(torch.dot(diff, diff).item())
-        if self.true_hessian_inv is not None and optimizer.hessian_inv is not None:
+        if self.true_hessian_inv is not None and hasattr(optimizer, "hessian_inv"):
             hessian_inv_errors[optimizer.name].append(
                 torch.norm(
                     optimizer.hessian_inv - self.true_hessian_inv, p="fro"
                 ).item()
             )
 
-    def run(self, pbars: Tuple[tqdm, tqdm] = None) -> Tuple[dict, dict]:
+    def run(
+        self, pbars: Tuple[tqdm, tqdm] = None, eval_time: bool = False
+    ) -> Tuple[dict, dict]:
         """
         Run the experiment for a given initial theta, a dataset and a list of optimizers
         """
@@ -143,21 +158,28 @@ class Simulation:
             else self.batch_size
         )
 
-        # Initialize the directories for errors if true values are provided
-        theta_errors = (
-            {optimizer.name: [] for optimizer in self.optimizer_list}
-            if self.true_theta is not None
-            else None
-        )
-        hessian_inv_errors = (
-            {optimizer.name: [] for optimizer in self.optimizer_list}
-            if self.true_hessian_inv is not None
-            else None
-        )
+        # Initialize the directories for errors if true values are provided and eval_time is False
+        if self.true_theta is not None and eval_time is False:
+            theta_errors = {optimizer.name: [] for optimizer in self.optimizer_list}
+        else:
+            theta_errors = None
+        if self.true_hessian_inv is not None and eval_time is False:
+            hessian_inv_errors = {
+                optimizer.name: [] for optimizer in self.optimizer_list
+            }
+        else:
+            hessian_inv_errors = None
+
         # Store accuracies if test dataset is provided
         accuracies = {} if self.test_dataset is not None else None
 
-        # tqdm with VScode bugs, have to initialize the bars outside and reset in the loop
+        # Store execution times if eval_time is True, and last theta error if true_theta is provided
+        execution_times = {} if eval_time is True else None
+        last_theta_error = (
+            {} if eval_time is True and self.true_theta is not None else None
+        )
+
+        # tqdm with VScode bugs, have to initialize the bars outside and reset in the loop.
         if pbars is not None:
             optimizer_pbar, data_pbar = pbars
             optimizer_pbar.reset(total=len(self.optimizer_list))
@@ -171,17 +193,20 @@ class Simulation:
 
         # Run the experiment for each optimizer
         for optimizer in self.optimizer_list:
-            optimizer.reset(self.initial_theta)
             optimizer_pbar.set_description(optimizer.name)
+
+            # Initialize the theta
             if self.use_torch:
                 self.theta = self.initial_theta.clone().to(self.device)
             else:
                 self.theta = self.initial_theta.copy()
 
-            # Log initial error
-            self.logging_estimation_error(theta_errors, hessian_inv_errors, optimizer)
-
+            # Reset the progress bar for the data and log the initial error
             data_pbar.reset(total=len(self.dataset))
+            if eval_time is False:
+                self.logging_estimation_error(
+                    theta_errors, hessian_inv_errors, optimizer
+                )
 
             # Initialize the data loader
             if self.use_torch:
@@ -191,13 +216,27 @@ class Simulation:
             else:
                 data_loader = self.dataset.batch_iter(batch_size)
 
+            # Start timing the optimizer
+            time_start = time.time()
+            optimizer.reset(self.initial_theta)
+
             # Run the optimizer on the dataset
             for data in data_loader:
                 optimizer.step(data, self.theta, self.g)
-                self.logging_estimation_error(
-                    theta_errors, hessian_inv_errors, optimizer
-                )
+                if eval_time is False:
+                    self.logging_estimation_error(
+                        theta_errors, hessian_inv_errors, optimizer
+                    )
                 data_pbar.update(batch_size)
+
+            if eval_time:
+                time_end = time.time()
+                execution_times[optimizer.name] = time_end - time_start
+                if self.true_theta is not None:
+                    last_theta_error[optimizer.name] = np.dot(
+                        self.theta - self.true_theta, self.theta - self.true_theta
+                    )
+
             optimizer_pbar.update(1)
 
             # Calculate and store accuracies if test dataset is provided
@@ -223,16 +262,24 @@ class Simulation:
             accuracies_df = pd.DataFrame(accuracies)
             styled_df = accuracies_df.style.apply(self.highlight_max, axis=1)
             if self.dataset is not None:
-                styled_df.set_caption("Accuracy on " + self.dataset_name + " dataset")
+                title = (
+                    f"Accuracy on {self.dataset_name} dataset, batch size={batch_size}"
+                )
+                styled_df.set_caption(title)
 
             # Clear the cell output, because of tqdm bug widgets after reopen
             clear_output(wait=True)
 
             display(styled_df)
 
-        return theta_errors, hessian_inv_errors
+        if eval_time:
+            return execution_times, last_theta_error
+        else:
+            return theta_errors, hessian_inv_errors
 
-    def run_multiple_datasets(self, N: int = 100, n: int = 10_000):
+    def run_multiple_datasets(
+        self, N: int = 100, n: int = 10_000, eval_time: bool = False
+    ):
         """
         Run the experiment multiple times by generating a new dataset and initial theta each time
         """
@@ -240,8 +287,12 @@ class Simulation:
             raise ValueError("true_theta and/or create_dataset are not set")
 
         # Initialize error dictionaries to hold results for each e value
-        all_theta_errors_avg = {}
-        all_hessian_inv_errors_avg = {}
+        if eval_time:
+            all_execution_times = {}
+            all_last_theta_error = {}
+        else:
+            all_theta_errors_avg = {}
+            all_hessian_inv_errors_avg = {}
 
         runs_pbar = tqdm(range(N), position=0, leave=False)
         optimizer_pbar = tqdm(
@@ -250,14 +301,23 @@ class Simulation:
         data_pbar = tqdm(total=n, desc="Data", position=2, leave=False)
 
         for e in self.e_values:
-            self.theta_errors_avg = {
-                optimizer.name: 0.0 for optimizer in self.optimizer_list
-            }
-            self.hessian_inv_errors_avg = (
-                {optimizer.name: 0.0 for optimizer in self.optimizer_list}
-                if self.true_hessian_inv is not None
-                else None
-            )
+            # Initialize the error/time dictionaries
+            if eval_time:
+                execution_times_list = {
+                    optimizer.name: [] for optimizer in self.optimizer_list
+                }
+                last_theta_errors_list = {
+                    optimizer.name: [] for optimizer in self.optimizer_list
+                }
+            else:
+                theta_errors_avg = {
+                    optimizer.name: 0.0 for optimizer in self.optimizer_list
+                }
+                hessian_inv_errors_avg = (
+                    {optimizer.name: 0.0 for optimizer in self.optimizer_list}
+                    if self.true_hessian_inv is not None
+                    else None
+                )
 
             runs_pbar.reset(total=N)
             runs_pbar.set_description(f"Runs for e={e}")
@@ -267,25 +327,43 @@ class Simulation:
                     n, self.true_theta
                 )
                 self.generate_initial_theta(e=e)
-                theta_errors, hessian_inv_errors = self.run(
-                    pbars=[optimizer_pbar, data_pbar]
-                )
+                if (
+                    eval_time
+                ):  # run with eval_time=True to get execution times and last theta error
+                    execution_time, last_theta_error = self.run(
+                        pbars=[optimizer_pbar, data_pbar], eval_time=True
+                    )
+                    for name, time in execution_time.items():
+                        execution_times_list[name].append(time)
+                    for name, error in last_theta_error.items():
+                        last_theta_errors_list[name].append(error)
+                else:  # run with eval_time=False to get theta and hessian inverse errors
+                    theta_errors, hessian_inv_errors = self.run(
+                        pbars=[optimizer_pbar, data_pbar]
+                    )
+                    for name, errors in theta_errors.items():
+                        theta_errors_avg[name] += np.array(errors) / N
+                    if self.true_hessian_inv is not None:
+                        for name, errors in hessian_inv_errors.items():
+                            hessian_inv_errors_avg[name] += np.array(errors) / N
 
-                for name, errors in theta_errors.items():
-                    self.theta_errors_avg[name] += np.array(errors) / N
-                if self.true_hessian_inv is not None:
-                    for name, errors in hessian_inv_errors.items():
-                        self.hessian_inv_errors_avg[name] += np.array(errors) / N
                 runs_pbar.update(1)
 
-            all_theta_errors_avg[e] = self.theta_errors_avg
-            all_hessian_inv_errors_avg[e] = self.hessian_inv_errors_avg
+            if eval_time:
+                all_execution_times[e] = execution_times_list
+                all_last_theta_error[e] = last_theta_errors_list
+            else:
+                all_theta_errors_avg[e] = theta_errors_avg
+                all_hessian_inv_errors_avg[e] = hessian_inv_errors_avg
 
         data_pbar.close()
         optimizer_pbar.close()
         runs_pbar.close()
 
-        self.plot_all_errors(all_theta_errors_avg, all_hessian_inv_errors_avg, N)
+        if eval_time:
+            self.plot_time_and_errors(all_execution_times, all_last_theta_error, N)
+        else:
+            self.plot_all_errors(all_theta_errors_avg, all_hessian_inv_errors_avg, N)
 
     def plot_errors(self, all_errors_avg: dict, ylabel: str, N: int):
         """
@@ -324,11 +402,10 @@ class Simulation:
 
         # Adjust layout to provide space for ylabel
         fig.subplots_adjust(left=0.1)
-        average = f" Average over {N} run" + ("s" if N > 1 else "")
-        fig.text(0.0, 0.5, ylabel + average, va="center", rotation="vertical")
+        fig.text(0.0, 0.5, ylabel, va="center", rotation="vertical")
 
         plt.suptitle(
-            f"{self.g.name} model, {self.dataset_name} dataset, batch size={self.batch_size}"
+            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size={self.batch_size}"
         )
         plt.tight_layout(pad=3.0)
         plt.show()
@@ -364,3 +441,62 @@ class Simulation:
                 index=data.index,
                 columns=data.columns,
             )
+
+    def plot_time_and_errors(
+        self, all_execution_times_avg: dict, all_last_theta_error_avg: dict, N: int
+    ):
+        """
+        Plot the execution times and last theta errors of all optimizers using seaborn
+        """
+        # Clear the cell output, because of tqdm bug widgets after reopen
+        clear_output(wait=True)
+
+        num_subplots = len(all_execution_times_avg) * 2
+        fig, axes = plt.subplots(
+            1, num_subplots, figsize=(4 * num_subplots, 6), sharey=False
+        )
+
+        e_values = list(all_execution_times_avg.keys())
+
+        # Initialize lists for legend handles and labels
+        handles = []
+        labels = []
+
+        for i, e in enumerate(e_values):
+            ax1 = axes[2 * i]
+            ax2 = axes[2 * i + 1]
+
+            # Boxplot with seaborn
+            box1 = sns.boxplot(data=all_execution_times_avg[e], ax=ax1)
+            box2 = sns.boxplot(data=all_last_theta_error_avg[e], ax=ax2)
+
+            ax1.set_title(f"e={e}")
+            ax1.set_ylabel("time (s)")
+            ax1.set_xticklabels([])  # Remove x-axis labels
+            ax2.set_ylabel("error")
+            ax2.set_xticklabels([])  # Remove x-axis labels
+
+            # Collect handles and labels for the legend from the first set of plots
+            if i == 0:
+                for patch, label in zip(
+                    box1.patches, all_execution_times_avg[e].keys()
+                ):
+                    handles.append(
+                        mpatches.Patch(color=patch.get_facecolor(), label=label)
+                    )
+
+        # Create a single legend outside the plotting area
+        fig.legend(
+            handles=handles,
+            loc="upper center",
+            ncol=len(handles),
+            bbox_to_anchor=(0.5, -0.05),
+        )
+
+        plt.suptitle(
+            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size={self.batch_size}"
+        )
+        plt.tight_layout(
+            rect=[0, 0.05, 1, 0.95]
+        )  # Adjust layout to make room for the legend
+        plt.show()

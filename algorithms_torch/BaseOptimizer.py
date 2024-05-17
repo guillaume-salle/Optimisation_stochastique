@@ -10,6 +10,7 @@ class BaseOptimizer(ABC):
     Base class for optimizers.
     """
 
+    @abstractmethod
     def __init__(self, *args, **kwargs) -> None:
         pass
 
@@ -21,6 +22,7 @@ class BaseOptimizer(ABC):
         """
         pass
 
+    @abstractmethod
     def step(
         self,
         data: torch.Tensor | Tuple[torch.Tensor, torch.Tensor],
