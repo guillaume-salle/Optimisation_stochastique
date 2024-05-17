@@ -73,6 +73,29 @@ class GeometricMedian(BaseObjectiveFunction):
             hessian = (np.eye(d) - np.outer(diff, diff) / norm**2) / norm
             return grad, hessian
 
+    def riccati(
+        self, data: np.ndarray, h: np.ndarray, iter: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the riccati term of the objective function
+        """
+        X = data.squeeze()
+        d = h.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        if norm < self.atol:
+            # Randomly select a direction for the Riccati term,
+            # so the outer product average to the identity matrix
+            z = np.random.randint(0, d)
+            riccati = np.zeros_like(h)
+            riccati[z] = 1
+            return np.zeros_like(h), riccati
+        grad = diff / norm
+        Z = np.random.randn(d)
+        alpha = 1 / (iter * math.log(iter + 1))
+        riccati = (self.grad(X, h + alpha * Z) - grad) * np.sqrt(norm) / alpha
+        return riccati
+
     def grad_and_riccati(
         self, data: np.ndarray, h: np.ndarray, iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:

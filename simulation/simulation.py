@@ -213,14 +213,6 @@ class Simulation:
                     "Test Accuracy": test_acc,
                 }
 
-            # Convert errors to numpy arrays for averaging
-            if theta_errors is not None:
-                theta_errors[optimizer.name] = np.array(theta_errors[optimizer.name])
-            if hessian_inv_errors is not None:
-                hessian_inv_errors[optimizer.name] = np.array(
-                    hessian_inv_errors[optimizer.name]
-                )
-
         # Close the progress bars
         if pbars is None:
             optimizer_pbar.close()
@@ -232,6 +224,10 @@ class Simulation:
             styled_df = accuracies_df.style.apply(self.highlight_max, axis=1)
             if self.dataset is not None:
                 styled_df.set_caption("Accuracy on " + self.dataset_name + " dataset")
+
+            # Clear the cell output, because of tqdm bug widgets after reopen
+            clear_output(wait=True)
+
             display(styled_df)
 
         return theta_errors, hessian_inv_errors
@@ -276,17 +272,11 @@ class Simulation:
                 )
 
                 for name, errors in theta_errors.items():
-                    self.theta_errors_avg[name] += errors
+                    self.theta_errors_avg[name] += np.array(errors) / N
                 if self.true_hessian_inv is not None:
                     for name, errors in hessian_inv_errors.items():
-                        self.hessian_inv_errors_avg[name] += errors
+                        self.hessian_inv_errors_avg[name] += np.array(errors) / N
                 runs_pbar.update(1)
-
-            for name in self.theta_errors_avg:
-                self.theta_errors_avg[name] /= N
-            if self.true_hessian_inv is not None:
-                for name in self.hessian_inv_errors_avg:
-                    self.hessian_inv_errors_avg[name] /= N
 
             all_theta_errors_avg[e] = self.theta_errors_avg
             all_hessian_inv_errors_avg[e] = self.hessian_inv_errors_avg
@@ -334,11 +324,11 @@ class Simulation:
 
         # Adjust layout to provide space for ylabel
         fig.subplots_adjust(left=0.1)
-        average = f"Average over {N} run" + ("s" if N > 1 else "")
+        average = f" Average over {N} run" + ("s" if N > 1 else "")
         fig.text(0.0, 0.5, ylabel + average, va="center", rotation="vertical")
 
         plt.suptitle(
-            f"{self.g.name}, {self.dataset_name} dataset, batch size={self.batch_size}"
+            f"{self.g.name} model, {self.dataset_name} dataset, batch size={self.batch_size}"
         )
         plt.tight_layout(pad=3.0)
         plt.show()

@@ -13,13 +13,10 @@ class pMeans(BaseObjectiveFunction):
         self.name = "p-means"
         self.p = p
         self.atol = 1e-7
-        if p >= 4:
-            self.hessian = self.hessian_without_inv
-            self.grad_and_hessian = self.grad_and_hessian_without_inv
-        elif p < 4 and p >= 1:
+        if p < 4 and p >= 1:
             self.hessian = self.hessian_with_inv
             self.grad_and_hessian = self.grad_and_hessian_with_inv
-        else:
+        elif p < 1:
             raise ValueError(
                 "The p-means objective function is only defined for p >= 1"
             )
@@ -51,7 +48,7 @@ class pMeans(BaseObjectiveFunction):
         grad = diff * norm ** (self.p - 2)
         return grad
 
-    def hessian_without_inv(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+    def hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
         Compute the Hessian of the objective function, returns Id if h is close to X
         """
@@ -80,7 +77,7 @@ class pMeans(BaseObjectiveFunction):
             ) * np.outer(diff, diff)
         return hessian
 
-    def grad_and_hessian_without_inv(
+    def grad_and_hessian(
         self, data: np.ndarray, h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """

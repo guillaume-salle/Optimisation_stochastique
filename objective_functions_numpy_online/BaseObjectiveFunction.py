@@ -25,13 +25,26 @@ class BaseObjectiveFunction(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def hessian(
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+    ) -> np.ndarray:
+        raise NotImplementedError
+
+    @abstractmethod
     def grad_and_hessian(
         self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
-    def grad_and_riccati(
+    def riccati(
         self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        raise NotImplementedError(
+            "Riccati is not implemented for this objective function"
+        )
+
+    def grad_and_riccati(
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError(
             "Riccati is not implemented for this objective function"

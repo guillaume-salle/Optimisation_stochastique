@@ -132,12 +132,28 @@ class LogisticRegression(BaseObjectiveFunction):
         hessian = p * (1 - p) * np.outer(X, X)
         return grad, hessian
 
+    def riccati(
+        self, data: Tuple, h: np.ndarray, iter: int = None
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the gradient and the Ricatti of the logistic loss
+        """
+        X, _ = data
+        X = X.squeeze()
+        if self.bias:
+            X = add_bias_1d(X)
+        dot_product = np.dot(X, h)
+        p = sigmoid(dot_product)
+        ricatti = math.sqrt(p * (1 - p)) * X
+        # alpha = max(math.sqrt(p * (1 - p)), 1.0 / iter**0.25)  # cf article bercu
+        # riccati = alpha * X
+        return ricatti
+
     def grad_and_riccati(
         self, data: Tuple, h: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Ricatti of the logistic loss
-        Does not work for a batch of data because of the outer product
         """
         X, y = data
         X = X.squeeze()
@@ -147,4 +163,6 @@ class LogisticRegression(BaseObjectiveFunction):
         p = sigmoid(dot_product)
         grad = (p - y) * X
         ricatti = np.sqrt(p * (1 - p)) * X
+        # alpha = max(math.sqrt(p * (1 - p)), 1.0 / iter**0.25)  # cf article bercu
+        # riccati = alpha * X
         return grad, ricatti

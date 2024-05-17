@@ -85,12 +85,27 @@ class LinearRegression(BaseObjectiveFunction):
         hessian = np.einsum("ni,nj->ij", X / n, X)
         return grad, hessian
 
+    def riccati(
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the riccati term of the linear regression loss, works only for a single data point
+        """
+        X, _ = data
+        n = X.shape[0]
+        if n != 1:
+            raise ValueError("The Riccati term is only defined for a single data point")
+        X = X.squeeze()
+        if self.bias:
+            X = add_bias_1d(X)
+        riccati = X
+        return riccati
+
     def grad_and_riccati(
         self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Riccati of the linear regression loss,
-        works only for a single data point
+        Compute the gradient and the riccati term of the linear regression loss, works only for a single data point
         """
         X, y = data
         n = X.shape[0]

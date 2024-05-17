@@ -131,6 +131,26 @@ class LogisticRegression(BaseObjectiveFunction):
         hessian = np.einsum("n,ni,nj->ij", p * (1 - p) / n, X, X)
         return grad, hessian
 
+    def riccati(
+        self, data: Tuple, h: np.ndarray, iter: int = None
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the ricatti term of the logistic loss, works only with a batch of size 1
+        """
+        X, _ = data
+        n = X.shape[0]
+        if n != 1:
+            raise ValueError("The Riccati term is only defined for a single data point")
+        X = X.squeeze()
+        if self.bias:
+            X = add_bias_1d(X)
+        dot_product = np.dot(X, h)
+        p = sigmoid(dot_product)
+        ricatti = math.sqrt(p * (1 - p)) * X
+        # alpha = max(math.sqrt(p * (1 - p)), 1.0 / iter**0.25)  # cf article bercu
+        # riccati = alpha * X
+        return ricatti
+
     def grad_and_riccati(
         self, data: Tuple, h: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
@@ -149,4 +169,6 @@ class LogisticRegression(BaseObjectiveFunction):
         p = sigmoid(dot_product)
         grad = (p - y) * X
         ricatti = math.sqrt(p * (1 - p)) * X
+        # alpha = max(math.sqrt(p * (1 - p)), 1.0 / iter**0.25)  # cf article bercu
+        # riccati = alpha * X
         return grad, ricatti

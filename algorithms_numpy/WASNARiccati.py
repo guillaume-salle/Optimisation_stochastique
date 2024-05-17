@@ -54,7 +54,9 @@ class WASNARiccati(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, phi = g.grad_and_riccati(data, theta, self.iter)
+        # grad = g.grad(data, self.theta_not_avg)
+        # phi = g.riccati(data, theta, self.iter) # article update hessian with theta averaged
+        grad, phi = g.grad_and_riccati(data, self.theta_not_avg, self.iter)
 
         # Update the hessian estimate
         product = self.hessian_bar_inv @ phi

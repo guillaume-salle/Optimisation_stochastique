@@ -57,7 +57,7 @@ class GeometricMedian(BaseObjectiveFunction):
         X = data
         n, d = X.shape
         diff = h - X
-        norm = np.linalg.norm(diff, dim=1)
+        norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
             np.isclose(norm, np.zeros_like(norm), atol=self.atol),
             np.ones_like(norm),
@@ -91,6 +91,32 @@ class GeometricMedian(BaseObjectiveFunction):
         )
         return grad, hessian
 
+    def riccati(
+        self, data: np.ndarray, h: np.ndarray, iter: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the riccati term of the objective function
+        """
+        X = data
+        n, d = X.shape
+        if n != 1:
+            raise ValueError("Riccati is only implemented for batch size 1")
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        if norm < self.atol:
+            # Randomly select a direction for the Riccati term,
+            # so the outer product average to the identity matrix
+            grad = np.zeros(d)
+            z = random.randint(0, d - 1)
+            riccati = np.zeros(d)
+            riccati[z] = 1
+            return grad, riccati
+        grad = diff / norm
+        Z = np.random.randn(d)
+        alpha = 1 / (iter * math.log(iter + 1))
+        riccati = (self.grad(X, h + alpha * Z) - grad) * math.sqrt(norm) / alpha
+        return riccati.squeeze()
+
     def grad_and_riccati(
         self, data: np.ndarray, h: np.ndarray, iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:
@@ -101,18 +127,18 @@ class GeometricMedian(BaseObjectiveFunction):
         n, d = X.shape
         if n != 1:
             raise ValueError("Riccati is only implemented for batch size 1")
-        X = X.squeeze()
         diff = h - X
         norm = np.linalg.norm(diff)
         if norm < self.atol:
-            # Randomly select a direction for the Riccati term, so the outer product
-            # average to the identity matrix
+            # Randomly select a direction for the Riccati term,
+            # so the outer product average to the identity matrix
+            grad = np.zeros(d)
             z = random.randint(0, d - 1)
             riccati = np.zeros(d)
             riccati[z] = 1
-            return np.zeros_like(h), riccati
+            return grad, riccati
         grad = diff / norm
         Z = np.random.randn(d)
         alpha = 1 / (iter * math.log(iter + 1))
-        riccati = (self.grad(X, h + alpha * Z) - grad) * np.sqrt(norm) / alpha
-        return grad, riccati
+        riccati = (self.grad(X, h + alpha * Z) - grad) * math.sqrt(norm) / alpha
+        return grad.squeeze(), riccati.squeeze()

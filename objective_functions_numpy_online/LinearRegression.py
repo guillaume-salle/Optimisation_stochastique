@@ -83,6 +83,19 @@ class LinearRegression(BaseObjectiveFunction):
         hessian = np.outer(X, X)
         return grad, hessian
 
+    def riccati(
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute and the Riccati term of the linear regression loss, works only for a single data point
+        """
+        X, _ = data
+        X = X.squeeze()
+        if self.bias:
+            X = add_bias_1d(X)
+        riccati = X
+        return riccati
+
     def grad_and_riccati(
         self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:

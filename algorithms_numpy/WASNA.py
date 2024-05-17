@@ -51,7 +51,9 @@ class WASNA(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, hessian = g.grad_and_hessian(data, theta)
+        # grad = g.grad(data, self.theta_not_avg)
+        # hessian = g.hessian(data, theta) # article update hessian with theta averaged
+        grad, hessian = g.grad_and_hessian(data, self.theta_not_avg)
 
         # Update the hessian estimate
         self.hessian_bar += hessian
