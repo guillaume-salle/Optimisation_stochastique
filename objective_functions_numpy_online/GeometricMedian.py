@@ -54,7 +54,26 @@ class GeometricMedian(BaseObjectiveFunction):
         if norm < self.atol:
             return np.eye(d)
         else:
-            return (np.eye(d) - np.outer(diff, diff) / norm**2) / norm
+            return np.eye(d) / norm - np.outer(diff, diff / (norm**3))
+
+    def hessian_column(
+        self, data: np.ndarray, h: np.ndarray, column: int
+    ) -> np.ndarray:
+        """
+        Compute a single column of the Hessian of the objective function
+        """
+        X = data.squeeze()
+        d = h.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        if norm < self.atol:
+            hessian_col = np.zeros(d)
+            hessian_col[column] = 1
+            return hessian_col
+        else:
+            hessian_col = (-diff[column] / (norm**3)) * diff
+            hessian_col[column] += 1 / norm
+            return hessian_col
 
     def grad_and_hessian(
         self, data: np.ndarray, h: np.ndarray
@@ -70,8 +89,28 @@ class GeometricMedian(BaseObjectiveFunction):
             return np.zeros_like(h), np.eye(d)
         else:
             grad = diff / norm
-            hessian = (np.eye(d) - np.outer(diff, diff) / norm**2) / norm
+            hessian = np.eye(d) / norm - np.outer(diff, diff / (norm**3))
             return grad, hessian
+
+    def grad_and_hessian_column(
+        self, data: np.ndarray, h: np.ndarray, column: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the gradient and a single column of the Hessian of the objective function
+        """
+        X = data.squeeze()
+        d = h.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        if norm < self.atol:
+            hessian_col = np.zeros(d)
+            hessian_col[column] = 1
+            return np.zeros_like(h), hessian_col
+        else:
+            grad = diff / norm
+            hessian_col = (-diff[column] / (norm**3)) * diff
+            hessian_col[column] += 1 / norm
+            return grad, hessian_col
 
     def riccati(
         self, data: np.ndarray, h: np.ndarray, iter: int
@@ -83,12 +122,11 @@ class GeometricMedian(BaseObjectiveFunction):
         d = h.shape[0]
         diff = h - X
         norm = np.linalg.norm(diff)
-        if norm < self.atol:
-            # Randomly select a direction for the Riccati term,
-            # so the outer product average to the identity matrix
+        if norm < self.atol:  # Randomly select a direction for the Riccati term,
+            # so the outer product averages to the identity matrix
             z = np.random.randint(0, d)
             riccati = np.zeros_like(h)
-            riccati[z] = 1
+            riccati[z] = math.sqrt(d)
             return np.zeros_like(h), riccati
         grad = diff / norm
         Z = np.random.randn(d)
@@ -106,12 +144,11 @@ class GeometricMedian(BaseObjectiveFunction):
         d = h.shape[0]
         diff = h - X
         norm = np.linalg.norm(diff)
-        if norm < self.atol:
-            # Randomly select a direction for the Riccati term, so the outer product
-            # average to the identity matrix
+        if norm < self.atol:  # Randomly select a direction for the Riccati term,
+            # so the outer product averages to the identity matrix
             z = np.random.randint(0, d)
             riccati = np.zeros_like(h)
-            riccati[z] = 1
+            riccati[z] = math.sqrt(d)
             return np.zeros_like(h), riccati
         grad = diff / norm
         Z = np.random.randn(d)

@@ -18,18 +18,21 @@ class WASNARiccati(BaseOptimizer):
         tau_theta: float = 2.0,
         add_iter_lr: int = 200,
         lambda_: float = 10.0,  # Weight more the initial identity matrix
+        compute_hessian_theta_avg: bool = True,  # Where to compute the hessian
     ):
         self.class_name = "WASNARiccati"
         self.name = (
-            ("WASNARiccati" if tau_theta != 0.0 else "SNA-Riccati")
+            ("WASNARiccati" if tau_theta != 0.0 else "SNARiccati")
             + (f" ν={nu}")
             + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
+            + (" NAT" if not compute_hessian_theta_avg else "")
         )
         self.nu = nu
         self.c_nu = c_nu
         self.tau_theta = tau_theta
         self.add_iter_lr = add_iter_lr
         self.lambda_ = lambda_
+        self.compute_hessian_theta_avg = compute_hessian_theta_avg
 
     def reset(self, initial_theta: np.ndarray):
         """
@@ -54,16 +57,18 @@ class WASNARiccati(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        # grad = g.grad(data, self.theta_not_avg)
-        # phi = g.riccati(data, theta, self.iter) # article update hessian with theta averaged
-        grad, phi = g.grad_and_riccati(data, self.theta_not_avg, self.iter)
+        if self.compute_hessian_theta_avg:  # cf article
+            grad = g.grad(data, self.theta_not_avg)
+            phi = g.riccati(data, theta, self.iter)
+        else:
+            grad, phi = g.grad_and_riccati(data, self.theta_not_avg, self.iter)
 
         # Update the hessian estimate
         product = self.hessian_bar_inv @ phi
         denominator = 1 + np.dot(phi, product)
         self.hessian_bar_inv += -np.outer(product, product) / denominator
 
-        # Update the theta estimate
+        # Update the not averaged theta
         learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         self.theta_not_avg += (
             -learning_rate
@@ -71,6 +76,8 @@ class WASNARiccati(BaseOptimizer):
             * self.hessian_bar_inv
             @ grad
         )
+
+        # Update the averaged theta
         weigth_theta = math.log(self.iter + 1) ** self.tau_theta
         self.sum_weights_theta += weigth_theta
         theta += (self.theta_not_avg - theta) * weigth_theta / self.sum_weights_theta

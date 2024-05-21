@@ -18,17 +18,20 @@ class WASNA(BaseOptimizer):
         tau_theta: float = 2.0,
         add_iter_lr: int = 200,
         lambda_: float = 10.0,  # Weight more the initial identity matrix
+        compute_hessian_theta_avg: bool = True,  # Where to compute the hessian
     ):
         self.name = (
             ("WASNA" if tau_theta != 0.0 else "SNA*")
             + (f" ν={nu}")
             + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
+            + (" NAT" if not compute_hessian_theta_avg else "")
         )
         self.nu = nu
         self.c_nu = c_nu
         self.tau_theta = tau_theta
         self.add_iter_lr = add_iter_lr
         self.lambda_ = lambda_
+        self.compute_hessian_theta_avg = compute_hessian_theta_avg
 
     def reset(self, initial_theta: np.ndarray):
         """
@@ -51,9 +54,11 @@ class WASNA(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        # grad = g.grad(data, self.theta_not_avg)
-        # hessian = g.hessian(data, theta) # article update hessian with theta averaged
-        grad, hessian = g.grad_and_hessian(data, self.theta_not_avg)
+        if self.compute_hessian_theta_avg:  # cf article
+            grad = g.grad(data, self.theta_not_avg)
+            hessian = g.hessian(data, theta)
+        else:
+            grad, hessian = g.grad_and_hessian(data, self.theta_not_avg)
 
         # Update the hessian estimate
         self.hessian_bar += hessian

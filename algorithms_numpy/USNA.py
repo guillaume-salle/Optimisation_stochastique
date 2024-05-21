@@ -62,17 +62,23 @@ class USNA(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        grad, hessian = g.grad_and_hessian(data, theta)
+        # grad, hessian = g.grad_and_hessian(data, theta)
 
-        self.update_hessian(hessian)
+        grad = self.update_hessian(g, data, theta)
 
         learning_rate_theta = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
         theta += -learning_rate_theta * self.hessian_inv @ grad
 
-    def update_hessian_normal(self, hessian: np.ndarray):
+    def update_hessian_normal(
+        self,
+        g: BaseObjectiveFunction,
+        data: np.ndarray | Tuple[np.ndarray, np.ndarray],
+        theta: np.ndarray,
+    ) -> np.ndarray:
         """
-        Update the hessian estimate with a normal random vector
+        Update the hessian estimate with a normal random vector, also returns grad
         """
+        grad, hessian = g.grad_and_hessian(data, theta)
         Z = np.random.randn(self.theta_dim)
         P = self.hessian_inv @ Z
         Q = hessian @ Z
@@ -85,30 +91,36 @@ class USNA(BaseOptimizer):
             self.hessian_inv += -learning_rate_hessian * (
                 product + product.transpose() - 2 * np.eye(self.theta_dim)
             )
+        return grad
 
-    def update_hessian_canonic(self, hessian: np.ndarray):
+    def update_hessian_canonic(
+        self,
+        g: BaseObjectiveFunction,
+        data: np.ndarray | Tuple[np.ndarray, np.ndarray],
+        theta: np.ndarray,
+    ) -> np.ndarray:
         """
-        Update the hessian estimate with a canonic random vector
+        Update the hessian estimate with a canonic random vector, also returns grad
         """
         if self.generate_Z == "canonic":
             z = np.random.randint(0, self.theta_dim)
         elif self.generate_Z == "canonic deterministic":
             z = self.k
-            self.k += 1
-            self.k = self.k % self.theta_dim
+            self.k = (self.k + 1) % self.theta_dim
         else:
             raise ValueError(
                 "Invalid value for Z. Choose 'canonic' or 'canonic deterministic'."
             )
+        grad, Q = g.grad_and_hessian_column(data, theta, z)
         # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later
         P = self.hessian_inv[:, z]
-        Q = hessian[:, z]
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (
             -self.gamma
         )
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * self.theta_dim <= beta**2:
+        if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
             product = self.theta_dim * np.outer(P, Q)
             self.hessian_inv += -learning_rate_hessian * (
                 product + product.transpose() - 2 * np.eye(self.theta_dim)
             )
+        return grad

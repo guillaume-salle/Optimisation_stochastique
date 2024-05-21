@@ -36,6 +36,18 @@ class BaseObjectiveFunction(ABC):
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
+    @abstractmethod
+    def hessian_column(
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, z: int
+    ) -> np.ndarray:
+        raise NotImplementedError
+
+    @abstractmethod
+    def grad_and_hessian_column(
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, z: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        raise NotImplementedError
+
     def riccati(
         self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:

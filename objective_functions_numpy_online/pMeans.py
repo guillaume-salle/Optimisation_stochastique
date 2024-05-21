@@ -13,10 +13,7 @@ class pMeans(BaseObjectiveFunction):
         self.name = "p-means"
         self.p = p
         self.atol = 1e-7
-        if p < 4 and p >= 1:
-            self.hessian = self.hessian_with_inv
-            self.grad_and_hessian = self.grad_and_hessian_with_inv
-        elif p < 1:
+        if p < 1:
             raise ValueError(
                 "The p-means objective function is only defined for p >= 1"
             )
@@ -40,36 +37,27 @@ class pMeans(BaseObjectiveFunction):
 
     def grad(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
-        Compute the gradient of the objective function
+        Compute the gradient of the objective function, works only for a single data point
         """
         X = data.squeeze()
         diff = h - X
         norm = np.linalg.norm(diff)
-        grad = diff * norm ** (self.p - 2)
+        if self.p < 2 and norm < self.atol:
+            grad = np.zeros(d)
+        else:
+            grad = diff * norm ** (self.p - 2)
         return grad
 
     def hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
-        Compute the Hessian of the objective function, returns Id if h is close to X
+        Compute the Hessian of the objective function, returns Id if h is close to X,
+        works only for a single data point
         """
         X = data.squeeze()
         d = h.shape[0]
         diff = h - X
         norm = np.linalg.norm(diff)
-        hessian = norm ** (self.p - 2) * np.eye(d) - (2 - self.p) * norm ** (
-            self.p - 4
-        ) * np.outer(diff, diff)
-        return hessian
-
-    def hessian_with_inv(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
-        """
-        Compute the Hessian of the objective function, returns Id if h is close to X
-        """
-        X = data.squeeze()
-        d = h.shape[0]
-        diff = h - X
-        norm = np.linalg.norm(diff)
-        if norm < self.atol:
+        if self.p < 4 and norm < self.atol:
             hessian = np.eye(d)
         else:
             hessian = norm ** (self.p - 2) * np.eye(d) - (2 - self.p) * norm ** (
@@ -77,38 +65,62 @@ class pMeans(BaseObjectiveFunction):
             ) * np.outer(diff, diff)
         return hessian
 
+    def hessian_column(
+        self, data: np.ndarray, h: np.ndarray, column: int
+    ) -> np.ndarray:
+        """
+        Compute a single column of the objective function, works only for a single data point
+        """
+        X = data.squeeze()
+        d = h.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        if self.p < 4 and norm < self.atol:
+            hessian_col = np.zeros(d)
+            hessian_col[column] = 1
+        else:
+            hessian_col = -(2 - self.p) * norm ** (self.p - 4) * diff[column] * diff
+            hessian_col[column] += norm ** (self.p - 2)
+        return hessian_col
+
+    def grad_and_hessian_column(
+        self, data: np.ndarray, h: np.ndarray, column: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the gradient and a single column of the Hessian of the objective function,
+        returns Id if h is close to X, works only for a single data point
+        """
+        X = data.squeeze()
+        d = h.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        if self.p < 4 and norm < self.atol:
+            grad = np.zeros(d)
+            hessian_col = np.zeros(d)
+            hessian_col[column] = 1
+        else:
+            grad = diff * norm ** (self.p - 2)
+            hessian_col = -(2 - self.p) * norm ** (self.p - 4) * diff[column] * diff
+            hessian_col[column] += norm ** (self.p - 2)
+        return grad, hessian_col
+
     def grad_and_hessian(
         self, data: np.ndarray, h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Hessian of the objective function, returns Id if h is close to X
+        Compute the gradient and the Hessian of the objective function, returns Id if h is close to X,
+        works only for a single data point
         """
         X = data.squeeze()
         d = h.shape[0]
         diff = h - X
         norm = np.linalg.norm(diff)
-        grad = diff * norm ** (self.p - 2)
-        hessian = norm ** (self.p - 2) * np.eye(d) - (2 - self.p) * norm ** (
-            self.p - 4
-        ) * np.outer(diff, diff)
-        return grad, hessian
-
-    def grad_and_hessian_with_inv(
-        self, data: np.ndarray, h: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Compute the gradient and the Hessian of the objective function, returns Id if h is close to X
-        """
-        X = data.squeeze()
-        d = h.shape[0]
-        diff = h - X
-        norm = np.linalg.norm(diff)
-        if norm < self.atol:
-            grad = np.zeros_like(h)
+        if self.p < 4 and norm < self.atol:
+            grad = np.zeros(d)
             hessian = np.eye(d)
-            return grad, hessian
-        grad = diff * norm ** (self.p - 2)
-        hessian = norm ** (self.p - 2) * np.eye(d) - (2 - self.p) * norm ** (
-            self.p - 4
-        ) * np.outer(diff, diff)
+        else:
+            grad = diff * norm ** (self.p - 2)
+            hessian = norm ** (self.p - 2) * np.eye(d) - (2 - self.p) * norm ** (
+                self.p - 4
+            ) * np.outer(diff, diff)
         return grad, hessian

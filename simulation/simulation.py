@@ -54,6 +54,7 @@ class Simulation:
         self.true_hessian_inv = true_hessian_inv
         self.g = g
         self.optimizer_list = optimizer_list
+        self.check_duplicate_names()
         self.batch_size = batch_size
         self.dataset = dataset
         self.test_dataset = test_dataset
@@ -88,6 +89,13 @@ class Simulation:
                 self.initial_theta = torch.as_tensor(
                     self.initial_theta, device=self.device
                 )
+
+    def check_duplicate_names(self):
+        name_set = set()
+        for optimizer in self.optimizer_list:
+            if optimizer.name in name_set:
+                raise ValueError(f"Duplicate optimizer name found: '{optimizer.name}'")
+            name_set.add(optimizer.name)
 
     def generate_initial_theta(self, e: float = 1.0):
         """
@@ -157,6 +165,8 @@ class Simulation:
             if self.batch_size == "streaming"
             else self.batch_size
         )
+        if self.test_dataset is not None:
+            eval_time = True
 
         # Initialize the directories for errors if true values are provided and eval_time is False
         if self.true_theta is not None and eval_time is False:
@@ -208,16 +218,16 @@ class Simulation:
                     theta_errors, hessian_inv_errors, optimizer
                 )
 
-            # Initialize the data loader
-            if self.use_torch:
+            if self.use_torch:  # Initialize the data loader
                 data_loader = DataLoader(
                     self.dataset, batch_size=batch_size, shuffle=False
                 )
             else:
                 data_loader = self.dataset.batch_iter(batch_size)
 
-            # Start timing the optimizer
-            time_start = time.time()
+            if eval_time:  # Start timing the optimizer
+                time_start = time.time()
+
             optimizer.reset(self.initial_theta)
 
             # Run the optimizer on the dataset
@@ -250,6 +260,7 @@ class Simulation:
                 accuracies[optimizer.name] = {
                     "Training Accuracy": train_acc,
                     "Test Accuracy": test_acc,
+                    "Time": round(execution_times[optimizer.name], 2),
                 }
 
         # Close the progress bars
@@ -487,16 +498,11 @@ class Simulation:
 
         # Create a single legend outside the plotting area
         fig.legend(
-            handles=handles,
-            loc="upper center",
-            ncol=len(handles),
-            bbox_to_anchor=(0.5, -0.05),
+            handles=handles, loc="center left", bbox_to_anchor=(1.0, 0.5), ncol=1
         )
 
         plt.suptitle(
             f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size={self.batch_size}"
         )
-        plt.tight_layout(
-            rect=[0, 0.05, 1, 0.95]
-        )  # Adjust layout to make room for the legend
+        plt.tight_layout(rect=[0, 0, 1, 1])  # Adjust layout to make room for the legend
         plt.show()

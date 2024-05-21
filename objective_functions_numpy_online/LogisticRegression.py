@@ -115,12 +115,26 @@ class LogisticRegression(BaseObjectiveFunction):
         hessian = p * (1 - p) * np.outer(X, X)
         return hessian
 
+    def hessian_column(
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, column: int
+    ) -> np.ndarray:
+        """
+        Compute a single column of the logistic loss, works only for a single data point
+        """
+        X, _ = data
+        X = X.squeeze()
+        if self.bias:
+            X = add_bias_1d(X)
+        dot_product = np.dot(X, h)
+        p = sigmoid(dot_product)
+        hessian_col = p * (1 - p) * X[column] * X
+        return hessian_col
+
     def grad_and_hessian(
         self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Hessian of the logistic loss
-        Does not work for a batch of data because of the outer product
+        Compute the gradient and the Hessian of the logistic loss, works only for a single data point
         """
         X, y = data
         X = X.squeeze()
@@ -132,11 +146,27 @@ class LogisticRegression(BaseObjectiveFunction):
         hessian = p * (1 - p) * np.outer(X, X)
         return grad, hessian
 
-    def riccati(
-        self, data: Tuple, h: np.ndarray, iter: int = None
+    def grad_and_hessian_column(
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, column: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Ricatti of the logistic loss
+        Compute the gradient and a single column of the logistic loss, works only for a single data point
+        """
+        X, y = data
+        X = X.squeeze()
+        if self.bias:
+            X = add_bias_1d(X)
+        dot_product = np.dot(X, h)
+        p = sigmoid(dot_product)
+        grad = (p - y) * X
+        hessian_col = p * (1 - p) * X[column] * X
+        return grad, hessian_col
+
+    def riccati(
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int = None
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the gradient and the Ricatti of the logistic loss, works only for a single data point
         """
         X, _ = data
         X = X.squeeze()
@@ -150,10 +180,10 @@ class LogisticRegression(BaseObjectiveFunction):
         return ricatti
 
     def grad_and_riccati(
-        self, data: Tuple, h: np.ndarray, iter: int = None
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Ricatti of the logistic loss
+        Compute the gradient and the Ricatti of the logistic loss, works only for a single data point
         """
         X, y = data
         X = X.squeeze()

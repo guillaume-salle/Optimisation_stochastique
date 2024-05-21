@@ -16,17 +16,20 @@ class WASGD(BaseOptimizer):
         self,
         nu: float = 0.75,
         c_nu: float = 5.0,
+        weighted: bool = True,
         tau: float = 2.0,
         add_iter_lr: int = 200,
     ):
         self.name = (
-            ("WASGD" if tau != 0.0 else "ASGD")
+            ("WASGD" if weighted else "ASGD")
             + (f" ν={nu}")
             + (f" τ={tau}" if tau != 0.0 and tau != 2.0 else "")
         )
         self.nu = nu
         self.c_nu = c_nu
-        self.tau = tau
+        self.weighted = weighted
+        if weighted:
+            self.tau = tau
         self.add_iter_lr = add_iter_lr  # Dont start at 0 to avoid large learning rates at the beginning
 
     def reset(self, initial_theta: np.ndarray):
@@ -48,9 +51,15 @@ class WASGD(BaseOptimizer):
         """
         self.iter += 1
         grad = g.grad(data, self.theta_not_averaged)
+
+        # Update non averaged theta
         learning_rate = self.c_nu * ((self.iter + self.add_iter_lr) ** (-self.nu))
         self.theta_not_averaged += -learning_rate * grad
 
-        weight = math.log(self.iter + 1) ** self.tau
+        # Update averaged theta
+        if self.weighted:
+            weight = math.log(self.iter + 1) ** self.tau
+        else:
+            weight = 1
         self.sum_weights += weight
         theta += (self.theta_not_averaged - theta) * weight / self.sum_weights
