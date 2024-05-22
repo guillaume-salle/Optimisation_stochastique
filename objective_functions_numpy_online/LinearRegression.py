@@ -69,7 +69,7 @@ class LinearRegression(BaseObjectiveFunction):
         return np.outer(X, X)
 
     def hessian_column(
-        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, column: int
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, col: int
     ) -> np.ndarray:
         """
         Compute a single column of the Hessian of the linear regression loss,
@@ -79,7 +79,7 @@ class LinearRegression(BaseObjectiveFunction):
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        hessian_col = X[column] * X
+        hessian_col = X[col] * X
         return hessian_col
 
     def grad_and_hessian(
@@ -98,7 +98,7 @@ class LinearRegression(BaseObjectiveFunction):
         return grad, hessian
 
     def grad_and_hessian_column(
-        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, column: int
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, col: int
     ) -> np.ndarray:
         """
         Compute the gradient and a single culomn of the Hessian of the linear regression loss,
@@ -110,7 +110,7 @@ class LinearRegression(BaseObjectiveFunction):
             X = add_bias_1d(X)
         Y_pred = np.dot(X, theta)
         grad = (Y_pred - y) * X
-        hessian_col = X[column] * X
+        hessian_col = X[col] * X
         return grad, hessian_col
 
     def riccati(

@@ -123,7 +123,7 @@ class UWASNA(BaseOptimizer):
             hessian = g.hessian(data, theta)
         else:
             grad, hessian = g.grad_and_hessian(data, self.theta_not_avg)
-        Z = np.random.randn(self.theta_dim)
+        Z = np.random.standard_normal(self.theta_dim)
         P = self.hessian_inv_not_avg @ Z  # Use the non averaged hessian to compute P
         Q = hessian @ Z
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (

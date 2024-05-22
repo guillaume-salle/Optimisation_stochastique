@@ -72,9 +72,7 @@ class SphericalDistribution(BaseObjectiveFunction):
         hessian[-1, -1] = 1
         return hessian
 
-    def hessian_column(
-        self, data: np.ndarray, h: np.ndarray, column: int
-    ) -> np.ndarray:
+    def hessian_column(self, data: np.ndarray, h: np.ndarray, col: int) -> np.ndarray:
         """
         Compute a single column of the objective function, works only for a single data point
         """
@@ -86,19 +84,19 @@ class SphericalDistribution(BaseObjectiveFunction):
         if norm < self.atol:
             # Return the column of the identity matrix
             hessian_column = np.zeros_like(h)
-            hessian_column[column] = 1
+            hessian_column[col] = 1
             return hessian_column
         hessian_column = np.empty_like(h)
-        if column < h.size - 1:
-            hessian_column[:-1] = (b / norm**3) * diff[column] * diff
-            hessian_column[column] += 1 - b / norm
+        if col < h.size - 1:
+            hessian_column[:-1] = (b / norm**3) * diff[col] * diff
+            hessian_column[col] += 1 - b / norm
         else:
             hessian_column[:-1] = diff / norm
             hessian_column[-1] = 1
         return hessian_column
 
     def grad_and_hessian_column(
-        self, data: np.ndarray, h: np.ndarray, column: int
+        self, data: np.ndarray, h: np.ndarray, col: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and a single column of the Hessian of the objective function,
@@ -114,14 +112,14 @@ class SphericalDistribution(BaseObjectiveFunction):
             grad[:-1] = 0
             grad[-1] = b
             hessian_column = np.zeros_like(h)
-            hessian_column[column] = 1
+            hessian_column[col] = 1
             return grad, hessian_column
         grad[:-1] = (-1 + b / norm) * diff
         grad[-1] = b - norm
         hessian_column = np.empty_like(h)
-        if column < h.size - 1:
-            hessian_column[:-1] = (b / norm**3) * diff[column] * diff
-            hessian_column[column] += 1 - b / norm
+        if col < h.size - 1:
+            hessian_column[:-1] = (b / norm**3) * diff[col] * diff
+            hessian_column[col] += 1 - b / norm
         else:
             hessian_column[:-1] = diff / norm
             hessian_column[-1] = 1

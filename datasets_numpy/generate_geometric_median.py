@@ -9,7 +9,7 @@ def generate_covariance_matrix(d, eigenvalues) -> np.ndarray:
     D = np.diag(eigenvalues)
 
     # Generate a random orthogonal matrix Q
-    Q, R = np.linalg.qr(np.random.randn(d, d))
+    Q, R = np.linalg.qr(np.random.standard_normal((d, d)))
 
     # Ensure Q is truly orthogonal
     Q = Q @ np.diag(np.sign(R.diagonal()))

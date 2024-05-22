@@ -56,9 +56,7 @@ class GeometricMedian(BaseObjectiveFunction):
         else:
             return np.eye(d) / norm - np.outer(diff, diff / (norm**3))
 
-    def hessian_column(
-        self, data: np.ndarray, h: np.ndarray, column: int
-    ) -> np.ndarray:
+    def hessian_column(self, data: np.ndarray, h: np.ndarray, col: int) -> np.ndarray:
         """
         Compute a single column of the Hessian of the objective function
         """
@@ -68,11 +66,11 @@ class GeometricMedian(BaseObjectiveFunction):
         norm = np.linalg.norm(diff)
         if norm < self.atol:
             hessian_col = np.zeros(d)
-            hessian_col[column] = 1
+            hessian_col[col] = 1
             return hessian_col
         else:
-            hessian_col = (-diff[column] / (norm**3)) * diff
-            hessian_col[column] += 1 / norm
+            hessian_col = (-diff[col] / (norm**3)) * diff
+            hessian_col[col] += 1 / norm
             return hessian_col
 
     def grad_and_hessian(
@@ -93,23 +91,22 @@ class GeometricMedian(BaseObjectiveFunction):
             return grad, hessian
 
     def grad_and_hessian_column(
-        self, data: np.ndarray, h: np.ndarray, column: int
+        self, data: np.ndarray, h: np.ndarray, col: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and a single column of the Hessian of the objective function
         """
         X = data.squeeze()
-        d = h.shape[0]
         diff = h - X
         norm = np.linalg.norm(diff)
         if norm < self.atol:
-            hessian_col = np.zeros(d)
-            hessian_col[column] = 1
+            hessian_col = np.zeros_like(h)
+            hessian_col[col] = 1
             return np.zeros_like(h), hessian_col
         else:
             grad = diff / norm
-            hessian_col = (-diff[column] / (norm**3)) * diff
-            hessian_col[column] += 1 / norm
+            hessian_col = (-diff[col] / (norm**3)) * diff
+            hessian_col[col] += 1 / norm
             return grad, hessian_col
 
     def riccati(

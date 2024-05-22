@@ -43,7 +43,7 @@ class pMeans(BaseObjectiveFunction):
         diff = h - X
         norm = np.linalg.norm(diff)
         if self.p < 2 and norm < self.atol:
-            grad = np.zeros(d)
+            grad = np.zeros_like(h)
         else:
             grad = diff * norm ** (self.p - 2)
         return grad
@@ -65,9 +65,7 @@ class pMeans(BaseObjectiveFunction):
             ) * np.outer(diff, diff)
         return hessian
 
-    def hessian_column(
-        self, data: np.ndarray, h: np.ndarray, column: int
-    ) -> np.ndarray:
+    def hessian_column(self, data: np.ndarray, h: np.ndarray, col: int) -> np.ndarray:
         """
         Compute a single column of the objective function, works only for a single data point
         """
@@ -77,14 +75,14 @@ class pMeans(BaseObjectiveFunction):
         norm = np.linalg.norm(diff)
         if self.p < 4 and norm < self.atol:
             hessian_col = np.zeros(d)
-            hessian_col[column] = 1
+            hessian_col[col] = 1
         else:
-            hessian_col = -(2 - self.p) * norm ** (self.p - 4) * diff[column] * diff
-            hessian_col[column] += norm ** (self.p - 2)
+            hessian_col = -(2 - self.p) * norm ** (self.p - 4) * diff[col] * diff
+            hessian_col[col] += norm ** (self.p - 2)
         return hessian_col
 
     def grad_and_hessian_column(
-        self, data: np.ndarray, h: np.ndarray, column: int
+        self, data: np.ndarray, h: np.ndarray, col: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and a single column of the Hessian of the objective function,
@@ -97,11 +95,11 @@ class pMeans(BaseObjectiveFunction):
         if self.p < 4 and norm < self.atol:
             grad = np.zeros(d)
             hessian_col = np.zeros(d)
-            hessian_col[column] = 1
+            hessian_col[col] = 1
         else:
             grad = diff * norm ** (self.p - 2)
-            hessian_col = -(2 - self.p) * norm ** (self.p - 4) * diff[column] * diff
-            hessian_col[column] += norm ** (self.p - 2)
+            hessian_col = -(2 - self.p) * norm ** (self.p - 4) * diff[col] * diff
+            hessian_col[col] += norm ** (self.p - 2)
         return grad, hessian_col
 
     def grad_and_hessian(

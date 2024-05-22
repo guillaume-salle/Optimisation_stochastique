@@ -403,7 +403,11 @@ class Simulation:
             )
 
             for (name, errors), mk, me in zip(errors_dict.items(), markers, markevery):
-                ax.plot(errors, label=name, marker=mk, markersize=10, markevery=me)
+                # Multiply the x-axis values by batch_size
+                x_values = [i * self.batch_size for i in range(len(errors))]
+                ax.plot(
+                    x_values, errors, label=name, marker=mk, markersize=10, markevery=me
+                )
 
             ax.set_xscale("log")
             ax.set_yscale("log")

@@ -115,6 +115,37 @@ class LogisticRegression(BaseObjectiveFunction):
         hessian = np.einsum("n,ni,nj->ij", p * (1 - p) / n, X, X)
         return hessian
 
+    def hessian_column(
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, col: int
+    ) -> np.ndarray:
+        """
+        Compute a single column of the hessian of the objective function
+        """
+        X, _ = data
+        n = X.shape[0]
+        if self.bias:
+            X = add_bias(X)
+        dot_product = np.dot(X, h)
+        p = sigmoid_array(dot_product)
+        hessian_col = np.dot(X.T, p * (1 - p) * X[:, col]) / n
+        return hessian_col
+
+    def grad_and_hessian_column(
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, col: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the gradient and a single column of the hessian of the objective function
+        """
+        X, y = data
+        n = X.shape[0]
+        if self.bias:
+            X = add_bias(X)
+        dot_product = np.dot(X, h)
+        p = sigmoid_array(dot_product)
+        grad = np.dot(X.T, p - y) / n
+        hessian_col = np.dot(X.T, p * (1 - p) * X[:, col]) / n
+        return grad, hessian_col
+
     def grad_and_hessian(
         self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:

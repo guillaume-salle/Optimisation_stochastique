@@ -15,7 +15,7 @@ def generate_spherical_distribution(
     r = true_theta[-1]
 
     # U is randomly generated on the unit sphere
-    U = np.random.randn(n, mu.shape[0])
+    U = np.random.standard_normal((n, mu.shape[0]))
     U /= np.linalg.norm(U, axis=1, keepdims=True)
 
     # W is a random scaling factor to vary the radius slightly

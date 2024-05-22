@@ -43,7 +43,7 @@ class GeometricMedian(BaseObjectiveFunction):
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
             np.isclose(norm, np.zeros_like(norm), atol=self.atol),
-            np.ones_like(norm),
+            np.ones(n),
             1 / norm,
         )
         grad = np.dot(diff.T, safe_inv_norm) / n
@@ -60,7 +60,7 @@ class GeometricMedian(BaseObjectiveFunction):
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
             np.isclose(norm, np.zeros_like(norm), atol=self.atol),
-            np.ones_like(norm),
+            np.ones(n),
             1 / norm,
         )
         # Divide here by n to have d+n operations instead of d^2
@@ -68,6 +68,43 @@ class GeometricMedian(BaseObjectiveFunction):
             "n,ni,nj->ij", safe_inv_norm**3 / n, diff, diff
         )
         return hessian
+
+    def hessian_column(self, data: np.ndarray, h: np.ndarray, col: int) -> np.ndarray:
+        """
+        Compute a single column of the hessian of the objective function
+        """
+        X = data
+        n = X.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff, axis=1)
+        safe_inv_norm = np.where(
+            np.isclose(norm, np.zeros_like(norm), atol=self.atol),
+            np.ones(n),
+            1 / norm,
+        )
+        hessian_column = np.dot(diff.T, -(safe_inv_norm**3) * diff[:, col]) / n
+        hessian_column[col] += np.mean(safe_inv_norm)
+        return hessian_column
+
+    def grad_and_hessian_column(
+        self, data: np.ndarray, h: np.ndarray, col: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the gradient and a single column of the hessian of the objective function
+        """
+        X = data
+        n = X.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff, axis=1)
+        safe_inv_norm = np.where(
+            np.isclose(norm, np.zeros_like(norm), atol=self.atol),
+            np.ones(n),
+            1 / norm,
+        )
+        grad = np.dot(diff.T, safe_inv_norm) / n
+        hessian_column = np.dot(diff.T, -(safe_inv_norm**3) * diff[:, col]) / n
+        hessian_column[col] += np.mean(safe_inv_norm)
+        return grad, hessian_column
 
     def grad_and_hessian(
         self, data: np.ndarray, h: np.ndarray
@@ -82,7 +119,7 @@ class GeometricMedian(BaseObjectiveFunction):
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
             np.isclose(norm, np.zeros_like(norm), atol=self.atol),
-            np.ones_like(norm),
+            np.ones(n),
             1 / norm,
         )
         grad = np.dot(diff.T, safe_inv_norm) / n

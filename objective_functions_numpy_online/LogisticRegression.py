@@ -116,7 +116,7 @@ class LogisticRegression(BaseObjectiveFunction):
         return hessian
 
     def hessian_column(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, column: int
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, col: int
     ) -> np.ndarray:
         """
         Compute a single column of the logistic loss, works only for a single data point
@@ -127,7 +127,7 @@ class LogisticRegression(BaseObjectiveFunction):
             X = add_bias_1d(X)
         dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
-        hessian_col = p * (1 - p) * X[column] * X
+        hessian_col = p * (1 - p) * X[col] * X
         return hessian_col
 
     def grad_and_hessian(
@@ -147,7 +147,7 @@ class LogisticRegression(BaseObjectiveFunction):
         return grad, hessian
 
     def grad_and_hessian_column(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, column: int
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, col: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and a single column of the logistic loss, works only for a single data point
@@ -159,7 +159,7 @@ class LogisticRegression(BaseObjectiveFunction):
         dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
         grad = (p - y) * X
-        hessian_col = p * (1 - p) * X[column] * X
+        hessian_col = p * (1 - p) * X[col] * X
         return grad, hessian_col
 
     def riccati(

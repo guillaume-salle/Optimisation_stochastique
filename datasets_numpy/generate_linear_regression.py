@@ -13,12 +13,12 @@ def generate_linear_regression(
 
     d = len(true_theta)
     if bias:
-        X = np.random.randn(n, d - 1)
+        X = np.random.standard_normal((n, d - 1))
         phi = np.hstack([np.ones((n, 1)), X])
     else:
-        X = np.random.randn(n, d)
+        X = np.random.standard_normal((n, d))
         phi = X
 
-    Y = phi @ true_theta + np.random.randn(n)
+    Y = phi @ true_theta + np.random.standard_normal((n))
 
     return MyDataset(X=X, Y=Y), name

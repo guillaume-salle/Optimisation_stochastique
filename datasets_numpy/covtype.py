@@ -24,7 +24,7 @@ def covtype(test_size: float = 0.2) -> Tuple[MyDataset, MyDataset, str]:
 
     # Split the data into training and testing sets
     X_train, X_test, Y_train_binary, Y_test_binary = train_test_split(
-        X, y_binary, test_size=test_size, random_state=42
+        X, y_binary, test_size=test_size, random_state=1
     )
 
     return MyDataset(X_train, Y_train_binary), MyDataset(X_test, Y_test_binary), name

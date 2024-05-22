@@ -79,7 +79,7 @@ class USNA(BaseOptimizer):
         Update the hessian estimate with a normal random vector, also returns grad
         """
         grad, hessian = g.grad_and_hessian(data, theta)
-        Z = np.random.randn(self.theta_dim)
+        Z = np.random.standard_normal(self.theta_dim)
         P = self.hessian_inv @ Z
         Q = hessian @ Z
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (

@@ -27,13 +27,19 @@ class BaseObjectiveFunction(ABC):
     @abstractmethod
     def hessian(
         self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    ) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
     def grad_and_hessian(
         self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def hessian_column(
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, z: int
+    ) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
@@ -50,7 +56,7 @@ class BaseObjectiveFunction(ABC):
         )
 
     def grad_and_riccati(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError(
             "Riccati is not implemented for this objective function"

@@ -27,10 +27,10 @@ def generate_logistic_regression(
 
     d = len(true_theta)
     if bias:
-        X = np.random.randn(n, d - 1)
+        X = np.random.standard_normal((n, d - 1))
         phi = np.hstack([np.ones((n, 1)), X])
     else:
-        X = np.random.randn(n, d)
+        X = np.random.standard_normal((n, d))
         phi = X
 
     Y = np.random.binomial(1, sigmoid_torch(phi @ true_theta))

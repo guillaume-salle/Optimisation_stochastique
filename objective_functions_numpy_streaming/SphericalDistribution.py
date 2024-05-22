@@ -43,8 +43,8 @@ class SphericalDistribution(BaseObjectiveFunction):
         diff = X - a
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
-            np.isclose(norm, np.zeros_like(norm), atol=self.atol),
-            np.ones_like(norm),
+            np.isclose(norm, np.zeros(n), atol=self.atol),
+            np.ones(n),
             1 / norm,
         )
         grad_a = np.dot(diff.T, -1 + b * safe_inv_norm) / n
@@ -64,8 +64,8 @@ class SphericalDistribution(BaseObjectiveFunction):
         diff = X - a
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
-            np.isclose(norm, np.zeros_like(norm), atol=self.atol),
-            np.ones_like(norm),
+            np.isclose(norm, np.zeros(n), atol=self.atol),
+            np.ones(n),
             1 / norm,
         )
         hessian = np.empty((d, d))
@@ -75,6 +75,27 @@ class SphericalDistribution(BaseObjectiveFunction):
         hessian[-1, :-1] = np.dot(diff.T, safe_inv_norm) / n
         hessian[:-1, -1] = hessian[-1, :-1]
         hessian[-1, -1] = 1
+        return hessian
+    
+    def hessian_column(self, data: np.ndarray, h: np.ndarray, col: int) -> np.ndarray:
+        """
+        Compute a single column of the hessian of the objective function
+        """
+        X = data
+        n = X.shape[0]
+        a = h[:-1]
+        b = h[-1]
+        diff = X - a
+        norm = np.linalg.norm(diff, axis=1)
+        safe_inv_norm = np.where(
+            np.isclose(norm, np.zeros(n), atol=self.atol),
+            np.ones(n),
+            1 / norm,
+        )
+        if col < len(h) - 1:
+            hessian = np.einsum("n,ni,nj->ij", b * safe_inv_norm**3 / n, diff[:, col], diff)
+        else:
+            hessian = np.dot(diff.T, safe_inv_norm) / n
         return hessian
 
     def grad_and_hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
@@ -89,8 +110,8 @@ class SphericalDistribution(BaseObjectiveFunction):
         diff = X - a
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
-            np.isclose(norm, np.zeros_like(norm), atol=self.atol),
-            np.ones_like(norm),
+            np.isclose(norm, np.zeros(n), atol=self.atol),
+            np.ones(n),
             1 / norm,
         )
         grad_a = np.dot(diff.T, -1 + b * safe_inv_norm) / n
