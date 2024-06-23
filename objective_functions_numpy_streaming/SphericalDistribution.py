@@ -42,14 +42,14 @@ class SphericalDistribution(BaseObjectiveFunction):
         b = h[-1]
         diff = X - a
         norm = np.linalg.norm(diff, axis=1)
+        grad = np.empty_like(h)
         safe_inv_norm = np.where(
             np.isclose(norm, np.zeros(n), atol=self.atol),
             np.ones(n),
             1 / norm,
         )
-        grad_a = np.dot(diff.T, -1 + b * safe_inv_norm) / n
-        grad_b = b - np.mean(norm)
-        grad = np.append(grad_a, grad_b)
+        grad[:-1] = np.dot(diff.T, -1 + b * safe_inv_norm) / n
+        grad[-1] = b - np.mean(norm)
         return grad
 
     def hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
@@ -69,14 +69,14 @@ class SphericalDistribution(BaseObjectiveFunction):
             1 / norm,
         )
         hessian = np.empty((d, d))
-        hessian[:-1, :-1] = (1 - b * np.mean(safe_inv_norm)) * np.eye(
-            d - 1
-        ) + np.einsum("n,ni,nj->ij", b * safe_inv_norm**3 / n, diff, diff)
+        hessian[:-1, :-1] = (1 - b * np.mean(safe_inv_norm)) * np.eye(d - 1) + np.einsum(
+            "n,ni,nj->ij", b * safe_inv_norm**3 / n, diff, diff
+        )
         hessian[-1, :-1] = np.dot(diff.T, safe_inv_norm) / n
         hessian[:-1, -1] = hessian[-1, :-1]
         hessian[-1, -1] = 1
         return hessian
-    
+
     def hessian_column(self, data: np.ndarray, h: np.ndarray, col: int) -> np.ndarray:
         """
         Compute a single column of the hessian of the objective function
@@ -92,11 +92,15 @@ class SphericalDistribution(BaseObjectiveFunction):
             np.ones(n),
             1 / norm,
         )
+        hessian_column = np.empty_like(h)
         if col < len(h) - 1:
-            hessian = np.einsum("n,ni,nj->ij", b * safe_inv_norm**3 / n, diff[:, col], diff)
+            hessian_column[:-1] = np.dot(diff.T, b * safe_inv_norm**3 * diff[:, col]) / n
+            hessian_column[col] += 1 - b * np.mean(safe_inv_norm)
+            hessian_column[-1] = np.mean(diff[:, col] * safe_inv_norm)
         else:
-            hessian = np.dot(diff.T, safe_inv_norm) / n
-        return hessian
+            hessian_column[:-1] = np.dot(diff.T, safe_inv_norm) / n
+            hessian_column[-1] = 1
+        return hessian_column
 
     def grad_and_hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
@@ -118,10 +122,40 @@ class SphericalDistribution(BaseObjectiveFunction):
         grad_b = b - np.mean(norm)
         grad = np.append(grad_a, grad_b)
         hessian = np.empty((d, d))
-        hessian[:-1, :-1] = (1 - b * np.mean(safe_inv_norm)) * np.eye(
-            d - 1
-        ) + np.einsum("n,ni,nj->ij", b * safe_inv_norm**3 / n, diff, diff)
+        hessian[:-1, :-1] = (1 - b * np.mean(safe_inv_norm)) * np.eye(d - 1) + np.einsum(
+            "n,ni,nj->ij", b * safe_inv_norm**3 / n, diff, diff
+        )
         hessian[-1, :-1] = np.dot(diff.T, safe_inv_norm) / n
         hessian[:-1, -1] = hessian[-1, :-1]
         hessian[-1, -1] = 1
         return grad, hessian
+
+    def grad_and_hessian_column(
+        self, data: np.ndarray, h: np.ndarray, col: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute a single column of the grad and Hessian of the objective function
+        """
+        X = data
+        n = X.shape[0]
+        a = h[:-1]
+        b = h[-1]
+        diff = X - a
+        norm = np.linalg.norm(diff, axis=1)
+        safe_inv_norm = np.where(
+            np.isclose(norm, np.zeros(n), atol=self.atol),
+            np.ones(n),
+            1 / norm,
+        )
+        grad_a = np.dot(diff.T, -1 + b * safe_inv_norm) / n
+        grad_b = b - np.mean(norm)
+        grad = np.append(grad_a, grad_b)
+        hessian_column = np.empty_like(h)
+        if col < len(h) - 1:
+            hessian_column[:-1] = np.dot(diff.T, b * safe_inv_norm**3 * diff[:, col]) / n
+            hessian_column[col] += 1 - b * np.mean(safe_inv_norm)
+            hessian_column[-1] = np.mean(diff[:, col] * safe_inv_norm)
+        else:
+            hessian_column[:-1] = np.dot(diff.T, safe_inv_norm) / n
+            hessian_column[-1] = 1
+        return grad, hessian_column

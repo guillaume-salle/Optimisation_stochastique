@@ -64,9 +64,7 @@ class SphericalDistribution(BaseObjectiveFunction):
             hessian = np.eye(d)
             return hessian
         hessian = np.empty((d, d))
-        hessian[:-1, :-1] = (1 - b / norm) * np.eye(d - 1) + (b / norm**3) * np.outer(
-            diff, diff
-        )
+        hessian[:-1, :-1] = (1 - b / norm) * np.eye(d - 1) + (b / norm**3) * np.outer(diff, diff)
         hessian[-1, :-1] = diff / norm
         hessian[:-1, -1] = diff / norm
         hessian[-1, -1] = 1
@@ -90,6 +88,7 @@ class SphericalDistribution(BaseObjectiveFunction):
         if col < h.size - 1:
             hessian_column[:-1] = (b / norm**3) * diff[col] * diff
             hessian_column[col] += 1 - b / norm
+            hessian_column[-1] = diff[col] / norm
         else:
             hessian_column[:-1] = diff / norm
             hessian_column[-1] = 1
@@ -120,14 +119,13 @@ class SphericalDistribution(BaseObjectiveFunction):
         if col < h.size - 1:
             hessian_column[:-1] = (b / norm**3) * diff[col] * diff
             hessian_column[col] += 1 - b / norm
+            hessian_column[-1] = diff[col] / norm
         else:
             hessian_column[:-1] = diff / norm
             hessian_column[-1] = 1
         return grad, hessian_column
 
-    def grad_and_hessian(
-        self, data: np.ndarray, h: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def grad_and_hessian(self, data: np.ndarray, h: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and Hessian of the objective function, works only for a single data point
         """
@@ -146,9 +144,7 @@ class SphericalDistribution(BaseObjectiveFunction):
         grad[:-1] = (-1 + b / norm) * diff
         grad[-1] = b - norm
         hessian = np.empty((d, d))
-        hessian[:-1, :-1] = (1 - b / norm) * np.eye(d - 1) + (b / norm**3) * np.outer(
-            diff, diff
-        )
+        hessian[:-1, :-1] = (1 - b / norm) * np.eye(d - 1) + (b / norm**3) * np.outer(diff, diff)
         hessian[-1, :-1] = diff / norm
         hessian[:-1, -1] = hessian[-1, :-1]
         hessian[-1, -1] = 1

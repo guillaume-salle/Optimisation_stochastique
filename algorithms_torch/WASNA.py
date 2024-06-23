@@ -16,7 +16,7 @@ class WASNA(BaseOptimizer):
         nu: float = 0.66,
         c_nu: float = 1.0,
         tau_theta: float = 2.0,
-        add_iter_lr: int = 20,
+        add_iter_theta: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix
         device: str = None,
     ):
@@ -28,7 +28,7 @@ class WASNA(BaseOptimizer):
         self.nu = nu
         self.c_nu = c_nu
         self.tau_theta = tau_theta
-        self.add_iter_lr = add_iter_lr
+        self.add_iter_theta = add_iter_theta
         self.lambda_ = lambda_
         self.device = device
         if device is None:
@@ -59,12 +59,10 @@ class WASNA(BaseOptimizer):
 
         # Update the hessian estimate
         self.hessian_bar += hessian
-        hessian_inv = torch.inverse(
-            self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
-        )
+        hessian_inv = torch.inverse(self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim))
 
         # Update the theta estimate
-        learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
+        learning_rate = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
         self.theta_not_avg += -learning_rate * hessian_inv @ grad
         weight_theta = math.log(self.iter + 1) ** self.tau_theta
         self.sum_weights_theta += weight_theta

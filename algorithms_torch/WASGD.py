@@ -17,7 +17,7 @@ class WASGD(BaseOptimizer):
         nu: float,
         c_mu: float = 1.0,
         tau: float = 2.0,
-        add_iter_lr: int = 20,
+        add_iter_theta: int = 20,
         device: str = None,
     ):
         self.name = (
@@ -28,7 +28,9 @@ class WASGD(BaseOptimizer):
         self.nu = nu
         self.c_nu = c_mu
         self.tau = tau
-        self.add_iter_lr = add_iter_lr  # Dont start at 0 to avoid large learning rates at the beginning
+        self.add_iter_theta = (
+            add_iter_theta  # Dont start at 0 to avoid large learning rates at the beginning
+        )
         self.device = device
         if device is None:
             self.device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -52,7 +54,7 @@ class WASGD(BaseOptimizer):
         """
         self.iter += 1
         grad = g.grad(data, self.theta_not_averaged)
-        learning_rate = self.c_nu * ((self.iter + self.add_iter_lr) ** (-self.nu))
+        learning_rate = self.c_nu * ((self.iter + self.add_iter_theta) ** (-self.nu))
         self.theta_not_averaged += -learning_rate * grad
 
         weight = math.log(self.iter + 1) ** self.tau

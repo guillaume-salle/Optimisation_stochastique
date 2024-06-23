@@ -17,19 +17,24 @@ class USNA(BaseOptimizer):
         gamma: float = 0.75,  # Set to 0.75 in the article
         c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
         generate_Z: str = "canonic",
-        add_iter_lr: int = 200,  # Works better
+        add_iter_theta: int = 20,
+        add_iter_hessian: int = 200,  # Works better
+        sym: bool = True,  # Symmetric estimate of the hessian
     ):
         self.name = (
             "USNA"
             + (f" ν={nu}")
             + (f" γ={gamma}")
             + (" Z~" + generate_Z if generate_Z != "canonic" else "")
+            + (" NS" if not sym else "")
         )
         self.nu = nu
         self.c_nu = c_nu
         self.gamma = gamma
         self.c_gamma = c_gamma
-        self.add_iter_lr = add_iter_lr
+        self.add_iter_theta = add_iter_theta
+        self.add_iter_hessian = add_iter_hessian
+        self.sym = sym
 
         # If Z is a random vector of canonic base, we can compute faster P and Q
         self.generate_Z = generate_Z
@@ -66,7 +71,7 @@ class USNA(BaseOptimizer):
 
         grad = self.update_hessian(g, data, theta)
 
-        learning_rate_theta = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
+        learning_rate_theta = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
         theta += -learning_rate_theta * self.hessian_inv @ grad
 
     def update_hessian_normal(
@@ -82,15 +87,19 @@ class USNA(BaseOptimizer):
         Z = np.random.standard_normal(self.theta_dim)
         P = self.hessian_inv @ Z
         Q = hessian @ Z
-        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (
-            -self.gamma
-        )
+        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
         if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
             product = np.outer(P, Q)
-            self.hessian_inv += -learning_rate_hessian * (
-                product + product.transpose() - 2 * np.eye(self.theta_dim)
-            )
+            if self.sym:
+                self.hessian_inv += -learning_rate_hessian * (
+                    product + product.transpose() - 2 * np.eye(self.theta_dim)
+                )
+            else:
+                self.hessian_inv += -learning_rate_hessian * (
+                    product.transpose() - np.eye(self.theta_dim)
+                )
+
         return grad
 
     def update_hessian_canonic(
@@ -108,19 +117,21 @@ class USNA(BaseOptimizer):
             z = self.k
             self.k = (self.k + 1) % self.theta_dim
         else:
-            raise ValueError(
-                "Invalid value for Z. Choose 'canonic' or 'canonic deterministic'."
-            )
+            raise ValueError("Invalid value for Z. Choose 'canonic' or 'canonic deterministic'.")
         grad, Q = g.grad_and_hessian_column(data, theta, z)
         # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later
         P = self.hessian_inv[:, z]
-        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (
-            -self.gamma
-        )
+        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
         if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
             product = self.theta_dim * np.outer(P, Q)
-            self.hessian_inv += -learning_rate_hessian * (
-                product + product.transpose() - 2 * np.eye(self.theta_dim)
-            )
+            if self.sym:
+                self.hessian_inv += -learning_rate_hessian * (
+                    product + product.transpose() - 2 * np.eye(self.theta_dim)
+                )
+            else:
+                self.hessian_inv += -learning_rate_hessian * (
+                    product.transpose() - np.eye(self.theta_dim)
+                )
+
         return grad

@@ -16,7 +16,7 @@ class WASNARiccati(BaseOptimizer):
         nu: float = 0.66,
         c_nu: float = 1.0,
         tau_theta: float = 2.0,
-        add_iter_lr: int = 20,
+        add_iter_theta: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix
         device: str = None,
     ):
@@ -29,7 +29,7 @@ class WASNARiccati(BaseOptimizer):
         self.nu = nu
         self.c_nu = c_nu
         self.tau_theta = tau_theta
-        self.add_iter_lr = add_iter_lr
+        self.add_iter_theta = add_iter_theta
         self.lambda_ = lambda_
         self.device = device
         if device is None:
@@ -44,9 +44,7 @@ class WASNARiccati(BaseOptimizer):
         self.theta_not_avg = initial_theta.detach().clone().to(self.device)
         self.sum_weights_theta = 0
         # Weight more the initial identity matrix
-        self.hessian_bar_inv = (
-            1 / (self.lambda_ * self.theta_dim) * torch.eye(self.theta_dim)
-        )
+        self.hessian_bar_inv = 1 / (self.lambda_ * self.theta_dim) * torch.eye(self.theta_dim)
 
     def step(
         self,
@@ -66,7 +64,7 @@ class WASNARiccati(BaseOptimizer):
         self.hessian_bar_inv += -torch.outer(product, product) / denominator
 
         # Update the theta estimate
-        learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
+        learning_rate = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
         self.theta_not_avg += (
             -learning_rate
             * (self.iter + self.lambda_ * self.theta_dim)

@@ -16,8 +16,8 @@ class WASNA(BaseOptimizer):
         nu: float = 0.75,
         c_nu: float = 1.0,
         tau_theta: float = 2.0,
-        add_iter_lr: int = 200,
-        lambda_: float = 10.0,  # Weight more the initial identity matrix
+        add_iter_theta: int = 20,
+        lambda_: int = 10,  # Weight more the initial identity matrix by lambda * d
         compute_hessian_theta_avg: bool = True,  # Where to compute the hessian
     ):
         self.name = (
@@ -29,7 +29,7 @@ class WASNA(BaseOptimizer):
         self.nu = nu
         self.c_nu = c_nu
         self.tau_theta = tau_theta
-        self.add_iter_lr = add_iter_lr
+        self.add_iter_theta = add_iter_theta
         self.lambda_ = lambda_
         self.compute_hessian_theta_avg = compute_hessian_theta_avg
 
@@ -67,7 +67,7 @@ class WASNA(BaseOptimizer):
         )
 
         # Update the theta estimate
-        learning_rate = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
+        learning_rate = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
         self.theta_not_avg += -learning_rate * hessian_inv @ grad
         weight_theta = math.log(self.iter + 1) ** self.tau_theta
         self.sum_weights_theta += weight_theta

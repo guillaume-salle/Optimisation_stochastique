@@ -18,7 +18,7 @@ class USNA(BaseOptimizer):
         gamma: float = 0.75,  # Set to 0.75 in the article
         c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
         generate_Z: str = "canonic",
-        add_iter_lr: int = 20,
+        add_iter_theta: int = 20,
         device: str = None,
     ):
         self.name = (
@@ -31,7 +31,7 @@ class USNA(BaseOptimizer):
         self.c_nu = c_nu
         self.gamma = gamma
         self.c_gamma = c_gamma
-        self.add_iter_lr = add_iter_lr
+        self.add_iter_theta = add_iter_theta
 
         # If Z is a random vector of canonic base, we can compute faster P and Q
         self.generate_Z = generate_Z
@@ -72,7 +72,7 @@ class USNA(BaseOptimizer):
 
         self.update_hessian(hessian)
 
-        learning_rate_theta = self.c_nu * (self.iter + self.add_iter_lr) ** (-self.nu)
+        learning_rate_theta = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
         theta += -learning_rate_theta * self.hessian_inv @ grad
 
     def update_hessian_normal(self, hessian: torch.Tensor):
@@ -82,9 +82,7 @@ class USNA(BaseOptimizer):
         Z = torch.randn(self.theta_dim, device=self.device)
         P = self.hessian_inv @ Z
         Q = hessian @ Z
-        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (
-            -self.gamma
-        )
+        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_theta) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
         if torch.dot(Q, Q) * torch.dot(Z, Z) <= beta**2:
             product = torch.outer(P, Q)
@@ -103,15 +101,11 @@ class USNA(BaseOptimizer):
             self.k += 1
             self.k = self.k % self.theta_dim
         else:
-            raise ValueError(
-                "Invalid value for Z. Choose 'canonic' or 'canonic deterministic'."
-            )
+            raise ValueError("Invalid value for Z. Choose 'canonic' or 'canonic deterministic'.")
         # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later
         P = self.hessian_inv[:, z]
         Q = hessian[:, z]
-        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_lr) ** (
-            -self.gamma
-        )
+        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_theta) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
         if torch.dot(Q, Q) * self.theta_dim <= beta**2:
             product = self.theta_dim * torch.outer(P, Q)

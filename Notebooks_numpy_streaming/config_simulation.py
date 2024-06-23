@@ -23,7 +23,8 @@ from datasets_numpy import (
 # Configuration for the number of runs and size of data
 N = 10
 n = int(1e4)
-batch_size = "streaming"
+batch_size_power = 1
+batch_size_power_list = [1]
 
 # Configuration for true theta
 # Value from the article:
@@ -42,7 +43,8 @@ e_values = [1, 2]
 simulation_linear_regression = partial(
     Simulation,
     g=LinearRegression(bias=bias_setting),
-    batch_size=batch_size,
+    batch_size_power=batch_size_power,
+    batch_size_power_list=batch_size_power_list,
     true_theta=true_theta,
     generate_dataset=partial(generate_linear_regression, bias=bias_setting),
     e_values=e_values,
@@ -53,7 +55,8 @@ simulation_logistic_regression = partial(
     Simulation,
     g=LogisticRegression(bias=bias_setting),
     true_theta=true_theta,
-    batch_size=batch_size,
+    batch_size_power=batch_size_power,
+    batch_size_power_list=batch_size_power_list,
     generate_dataset=partial(generate_logistic_regression, bias=bias_setting),
     e_values=e_values,
 )
@@ -63,7 +66,8 @@ true_theta_geometric_median = np.zeros(10)
 simulation_geometric_median = partial(
     Simulation,
     g=GeometricMedian(),
-    batch_size=batch_size,
+    batch_size_power=batch_size_power,
+    batch_size_power_list=batch_size_power_list,
     true_theta=true_theta_geometric_median,
     generate_dataset=generate_geometric_median,
     e_values=e_values,
@@ -77,7 +81,8 @@ true_theta_spherical_distribution = np.append(mu, r)
 simulation_spherical_distribution = partial(
     Simulation,
     g=SphericalDistribution(),
-    batch_size=batch_size,
+    batch_size_power=batch_size_power,
+    batch_size_power_list=batch_size_power_list,
     true_theta=true_theta_spherical_distribution,
     generate_dataset=partial(generate_spherical_distribution, delta=delta),
     e_values=[0.5, 1],
@@ -91,7 +96,8 @@ true_theta_p_means = np.zeros(d)
 simulation_p_means = partial(
     Simulation,
     g=pMeans(p=p),
-    batch_size=batch_size,
+    batch_size_power=batch_size_power,
+    batch_size_power_list=batch_size_power_list,
     true_theta=true_theta_p_means,
     generate_dataset=generate_p_means,
     e_values=e_values,
@@ -102,7 +108,8 @@ train_covtype, test_covtype, name = covtype()
 eval_covtype = partial(
     Simulation,
     g=LogisticRegression(bias=True),
-    batch_size=batch_size,
+    batch_size_power=batch_size_power,
+    batch_size_power_list=batch_size_power_list,
     true_theta=None,
     generate_dataset=None,
     dataset=train_covtype,

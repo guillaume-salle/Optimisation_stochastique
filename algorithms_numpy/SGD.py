@@ -11,11 +11,11 @@ class SGD(BaseOptimizer):
     Uses a learning rate lr = c_mu * iteration^(-mu)
     """
 
-    def __init__(self, nu: float, c_nu: float = 1.0, add_iter_lr: int = 20):
+    def __init__(self, nu: float, c_nu: float = 1.0, add_iter_theta: int = 20):
         self.name = "SGD" + f" ν={nu}"
         self.nu = nu
         self.c_nu = c_nu
-        self.add_iter_lr = add_iter_lr  # Dont start at 0 to avoid large learning rates at the beginning
+        self.add_iter_theta = add_iter_theta  # Dont start at 0 to avoid large learning rates at the beginning
 
     def reset(self, initial_theta: np.ndarray):
         """
@@ -34,5 +34,5 @@ class SGD(BaseOptimizer):
         """
         self.iter += 1
         grad = g.grad(data, theta_estimate)
-        learning_rate = self.c_nu * ((self.iter + self.add_iter_lr) ** (-self.nu))
+        learning_rate = self.c_nu * ((self.iter + self.add_iter_theta) ** (-self.nu))
         theta_estimate += -learning_rate * grad
