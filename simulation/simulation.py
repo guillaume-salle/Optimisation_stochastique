@@ -549,8 +549,10 @@ class Simulation:
 
             ax1.set_title(f"e={e}")
             ax1.set_ylabel("time (s)")
+            ax1.set_ylim(bottom=0)
             ax1.set_xticklabels([])  # Remove x-axis labels
             ax2.set_ylabel("error")
+            ax2.set_ylim(bottom=0)
             ax2.set_xticklabels([])  # Remove x-axis labels
 
             # Collect handles and labels for the legend from the first set of plots

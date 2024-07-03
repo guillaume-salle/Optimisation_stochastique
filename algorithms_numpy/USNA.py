@@ -23,8 +23,8 @@ class USNA(BaseOptimizer):
     ):
         self.name = (
             "USNA"
-            + (f" ν={nu}")
-            + (f" γ={gamma}")
+            + (f" ν={nu}" if nu != 1.0 else "")
+            + (f" γ={gamma}" if gamma != 0.75 else "")
             + (" Z~" + generate_Z if generate_Z != "canonic" else "")
             + (" NS" if not sym else "")
         )
@@ -89,16 +89,14 @@ class USNA(BaseOptimizer):
         Q = hessian @ Z
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
-            product = np.outer(P, Q)
+        if np.dot(Q, Q) * np.dot(Z, P) <= beta**2:
+            product = np.outer(Q, P)
             if self.sym:
                 self.hessian_inv += -learning_rate_hessian * (
                     product + product.transpose() - 2 * np.eye(self.theta_dim)
                 )
             else:
-                self.hessian_inv += -learning_rate_hessian * (
-                    product.transpose() - np.eye(self.theta_dim)
-                )
+                self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
 
         return grad
 
@@ -123,15 +121,20 @@ class USNA(BaseOptimizer):
         P = self.hessian_inv[:, z]
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
-            product = self.theta_dim * np.outer(P, Q)
-            if self.sym:
-                self.hessian_inv += -learning_rate_hessian * (
-                    product + product.transpose() - 2 * np.eye(self.theta_dim)
-                )
-            else:
-                self.hessian_inv += -learning_rate_hessian * (
-                    product.transpose() - np.eye(self.theta_dim)
-                )
+        # if np.dot(Q, Q) * self.theta_dim**2 * P[z] <= beta**2:
+        #     product = self.theta_dim * np.outer(Q, P)
+        #     if self.sym:
+        #         self.hessian_inv += -learning_rate_hessian * (
+        #             product + product.transpose() - 2 * np.eye(self.theta_dim)
+        #         )
+        #     else:
+        #         self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
+        product = self.theta_dim * np.outer(Q, P)
+        self.hessian_inv += -learning_rate_hessian * (
+            product
+            + product.transpose()
+            - 2 * np.eye(self.theta_dim)
+            + (learning_rate_hessian**2) * np.outer(Q, Q)
+        )
 
         return grad

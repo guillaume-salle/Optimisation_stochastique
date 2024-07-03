@@ -129,7 +129,7 @@ class UWASNA(BaseOptimizer):
         Q = hessian @ Z
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
+        if np.dot(Q, Q) * np.dot(Z, P) <= beta**2:
             product = np.outer(P, Q)
             if self.sym:
                 self.hessian_inv_not_avg += -learning_rate_hessian * (
@@ -168,7 +168,7 @@ class UWASNA(BaseOptimizer):
         P = self.hessian_inv_not_avg[:, z]  # Use the non averaged hessian to compute P
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
+        if np.dot(Q, Q) * self.theta_dim**2 * P[z] <= beta**2:
             product = self.theta_dim * np.outer(P, Q)  # Multiply by the dimension
             if self.sym:
                 self.hessian_inv_not_avg += -learning_rate_hessian * (
