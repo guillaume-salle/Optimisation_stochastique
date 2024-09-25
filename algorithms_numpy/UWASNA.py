@@ -25,6 +25,7 @@ class UWASNA(BaseOptimizer):
         compute_hessian_theta_avg: bool = True,  # Where to compute the hessian
         use_hessian_avg: bool = True,  # Use the averaged hessian
         sym: bool = True,  # Symmetric estimate of the hessian
+        algo: str = "article",
     ):
         self.name = (
             ("UWASNA" if (tau_theta != 0.0 or tau_hessian != 0.0) else "USNA")
@@ -36,6 +37,7 @@ class UWASNA(BaseOptimizer):
             + (" NAT" if not compute_hessian_theta_avg else "")
             + (" NAH" if not use_hessian_avg else "")
             + (" NS" if not sym else "")
+            + (" " + algo if algo != "article" else "")
         )
         self.nu = nu
         self.c_nu = c_nu
@@ -48,6 +50,7 @@ class UWASNA(BaseOptimizer):
         self.compute_hessian_theta_avg = compute_hessian_theta_avg
         self.use_hessian_avg = use_hessian_avg
         self.sym = sym
+        self.algo = algo
 
         # If Z is a random vector of canonic base, we can compute faster P and Q
         self.generate_Z = generate_Z
@@ -59,6 +62,12 @@ class UWASNA(BaseOptimizer):
             raise ValueError(
                 "Invalid value for Z. Choose 'normal', 'canonic' or 'canonic deterministic'."
             )
+
+        # TODO DELETE
+        if algo not in ["article", "bruno", "guillaume"]:
+            raise ValueError("Invalid value for algo. Choose 'article', 'bruno' or 'guillaume'.")
+        if algo == "guillaume":
+            self.update_hessian = self.update_hessian_guillaume
 
     def reset(self, initial_theta: np.ndarray):
         """
@@ -88,7 +97,8 @@ class UWASNA(BaseOptimizer):
         self.iter += 1
         grad = g.grad(data, self.theta_not_avg)  # gradient in the NOT averaged theta
 
-        # Update the not averaged hessian
+        # Update the not averaged hessian estimate
+        # and get the gradient from intermediate computation
         grad = self.update_hessian(g, data, theta)
 
         # Update the averaged hessian
@@ -129,15 +139,26 @@ class UWASNA(BaseOptimizer):
         Q = hessian @ Z
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * np.dot(Z, P) <= beta**2:
+        # TODO: check if the condition is correct
+        # if np.dot(Q, Q) * np.dot(Z, P) <= beta**2:
+        if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
             product = np.outer(P, Q)
-            if self.sym:
+            if self.algo == "article":
+                if self.sym:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product + product.transpose() - 2 * np.eye(self.theta_dim)
+                    )
+                else:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product.transpose() - np.eye(self.theta_dim)
+                    )
+            elif self.algo == "bruno":
                 self.hessian_inv_not_avg += -learning_rate_hessian * (
                     product + product.transpose() - 2 * np.eye(self.theta_dim)
-                )
-            else:
-                self.hessian_inv_not_avg += -learning_rate_hessian * (
-                    product.transpose() - np.eye(self.theta_dim)
+                ) + learning_rate_hessian**2 * np.einsum(
+                    "i,ij,j", Z, self.hessian_inv_not_avg, Z
+                ) * np.outer(
+                    Q, Q
                 )
         return grad
 
@@ -168,14 +189,63 @@ class UWASNA(BaseOptimizer):
         P = self.hessian_inv_not_avg[:, z]  # Use the non averaged hessian to compute P
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * self.theta_dim**2 * P[z] <= beta**2:
+        # TODO: Check if the condition is correct
+        # if np.dot(Q, Q) * self.theta_dim**2 * P[z] <= beta**2:
+        if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
             product = self.theta_dim * np.outer(P, Q)  # Multiply by the dimension
-            if self.sym:
+            if self.algo == "article":
+                if self.sym:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product + product.transpose() - 2 * np.eye(self.theta_dim)
+                    )
+                else:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product.transpose() - np.eye(self.theta_dim)
+                    )
+            elif self.algo == "bruno":
                 self.hessian_inv_not_avg += -learning_rate_hessian * (
                     product + product.transpose() - 2 * np.eye(self.theta_dim)
+                ) + learning_rate_hessian**2 * np.einsum(
+                    "i,ij,j", P, self.hessian_inv_not_avg, P
+                ) * np.outer(
+                    Q, Q
                 )
-            else:
-                self.hessian_inv_not_avg += -learning_rate_hessian * (
-                    product.transpose() - np.eye(self.theta_dim)
-                )
+        return grad
+
+    def update_hessian_canonic(
+        self,
+        g: BaseObjectiveFunction,
+        data: np.ndarray | Tuple[np.ndarray, np.ndarray],
+        theta: np.ndarray,
+    ):
+        """
+        Update the not averaged hessian estimate with a canonic base random vector, also returns grad
+        """
+        if self.generate_Z == "canonic":
+            z = np.random.randint(0, self.theta_dim)
+        elif self.generate_Z == "canonic deterministic":
+            z = self.k
+            self.k = (self.k + 1) % self.theta_dim
+        else:
+            raise ValueError("Invalid value for Z. Choose 'canonic' or 'canonic deterministic'.")
+
+        if self.compute_hessian_theta_avg:  # cf article
+            grad = g.grad(data, self.theta_not_avg)
+            Q = g.hessian_column(data, theta, z)
+        else:
+            grad, Q = g.grad_and_hessian_column(data, self.theta_not_avg, z)
+
+        # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later
+        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
+        beta = 1 / (2 * learning_rate_hessian)
+
+        # TODO: Check if the condition is correct
+        if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
+            # if np.dot(Q, Q) * self.theta_dim**2 * P[z] <= beta**2:
+            product = self.theta_dim * Q.T @ self.hessian_inv_not_avg
+            product[z] -= self.theta_dim
+            self.hessian_inv_not_avg[z, :] += -learning_rate_hessian * product
+            if self.sym:
+                self.hessian_inv_not_avg[:, z] += -learning_rate_hessian * product
+
         return grad

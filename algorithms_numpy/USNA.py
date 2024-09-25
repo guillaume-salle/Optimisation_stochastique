@@ -20,6 +20,7 @@ class USNA(BaseOptimizer):
         add_iter_theta: int = 20,
         add_iter_hessian: int = 200,  # Works better
         sym: bool = True,  # Symmetric estimate of the hessian
+        algo: str = "article",
     ):
         self.name = (
             "USNA"
@@ -27,6 +28,7 @@ class USNA(BaseOptimizer):
             + (f" γ={gamma}" if gamma != 0.75 else "")
             + (" Z~" + generate_Z if generate_Z != "canonic" else "")
             + (" NS" if not sym else "")
+            + (" " + algo if algo != "article" else "")
         )
         self.nu = nu
         self.c_nu = c_nu
@@ -46,6 +48,13 @@ class USNA(BaseOptimizer):
             raise ValueError(
                 "Invalid value for Z. Choose 'normal', 'canonic' or 'canonic deterministic'."
             )
+
+        # TODO DELETE
+        self.algo = algo
+        if algo not in ["article", "bruno", "guillaume"]:
+            raise ValueError("Invalid value for algo. Choose 'article', 'bruno' or 'guillaume'.")
+        if algo == "guillaume":
+            self.update_hessian = self.update_hessian_guillaume
 
     def reset(self, initial_theta: np.ndarray):
         """
@@ -67,10 +76,11 @@ class USNA(BaseOptimizer):
         Perform one optimization step
         """
         self.iter += 1
-        # grad, hessian = g.grad_and_hessian(data, theta)
 
+        # Update the hessian estimate and get the gradient from intermediate computation
         grad = self.update_hessian(g, data, theta)
 
+        # Update theta
         learning_rate_theta = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
         theta += -learning_rate_theta * self.hessian_inv @ grad
 
@@ -89,16 +99,29 @@ class USNA(BaseOptimizer):
         Q = hessian @ Z
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
-        if np.dot(Q, Q) * np.dot(Z, P) <= beta**2:
+        # TODO: Check if the condition is correct
+        # if np.dot(Q, Q) * np.dot(Z, P) <= beta**2:
+        if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
             product = np.outer(Q, P)
-            if self.sym:
+            if self.algo == "article":
+                if self.sym:
+                    self.hessian_inv += -learning_rate_hessian * (
+                        product + product.transpose() - 2 * np.eye(self.theta_dim)
+                    )
+                else:
+                    self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
+
+            elif self.algo == "bruno":
                 self.hessian_inv += -learning_rate_hessian * (
                     product + product.transpose() - 2 * np.eye(self.theta_dim)
+                ) + learning_rate_hessian**2 * np.einsum(
+                    "i,ij,j", Z, self.hessian_inv, Z
+                ) * np.outer(
+                    Q, Q
                 )
-            else:
-                self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
-
         return grad
+
+    # TODO: Factorize the code
 
     def update_hessian_canonic(
         self,
@@ -121,20 +144,56 @@ class USNA(BaseOptimizer):
         P = self.hessian_inv[:, z]
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
+
+        # TODO: Check if the condition is correct
         # if np.dot(Q, Q) * self.theta_dim**2 * P[z] <= beta**2:
-        #     product = self.theta_dim * np.outer(Q, P)
-        #     if self.sym:
-        #         self.hessian_inv += -learning_rate_hessian * (
-        #             product + product.transpose() - 2 * np.eye(self.theta_dim)
-        #         )
-        #     else:
-        #         self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
-        product = self.theta_dim * np.outer(Q, P)
-        self.hessian_inv += -learning_rate_hessian * (
-            product
-            + product.transpose()
-            - 2 * np.eye(self.theta_dim)
-            + (learning_rate_hessian**2) * np.outer(Q, Q)
-        )
+        if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
+            product = self.theta_dim * np.outer(Q, P)
+            if self.algo == "article":
+                if self.sym:
+                    self.hessian_inv += -learning_rate_hessian * (
+                        product + product.transpose() - 2 * np.eye(self.theta_dim)
+                    )
+                else:
+                    self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
+            elif self.algo == "bruno":
+                self.hessian_inv += -learning_rate_hessian * (
+                    product + product.transpose() - 2 * np.eye(self.theta_dim)
+                ) + learning_rate_hessian**2 * np.einsum(
+                    "i,ij,j", P, self.hessian_inv, P
+                ) * np.outer(
+                    Q, Q
+                )
+
+        return grad
+
+    def update_hessian_guillaume(
+        self,
+        g: BaseObjectiveFunction,
+        data: np.ndarray | Tuple[np.ndarray, np.ndarray],
+        theta: np.ndarray,
+    ) -> np.ndarray:
+        """
+        Update the hessian estimate with a canonic random vector, also returns grad
+        """
+        if self.generate_Z == "canonic":
+            z = np.random.randint(0, self.theta_dim)
+        elif self.generate_Z == "canonic deterministic":
+            z = self.k
+            self.k = (self.k + 1) % self.theta_dim
+        else:
+            raise ValueError("Invalid value for Z. Choose 'canonic' or 'canonic deterministic'.")
+        grad, Q = g.grad_and_hessian_column(data, theta, z)
+        # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later
+        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
+        beta = 1 / (2 * learning_rate_hessian)
+
+        # TODO: Check if the condition is correct
+        if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
+            product = self.theta_dim * Q.T @ self.hessian_inv
+            product[z] -= self.theta_dim
+            self.hessian_inv[z, :] += -learning_rate_hessian * product
+            if self.sym:
+                self.hessian_inv[:, z] += -learning_rate_hessian * product
 
         return grad

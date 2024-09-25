@@ -295,15 +295,33 @@ class Simulation:
             data_pbar.close()
 
         if metrics == "accuracies":
-            accuracies_df = pd.DataFrame(metrics_dict)
-            styled_df = accuracies_df.style.apply(self.highlight_max, axis=1)
-            if self.dataset is not None:
-                title = f"Accuracy on {self.dataset_name} dataset, d={len(self.theta)}, batch_size=d^{round(self.batch_size_power, 2)}"
-                styled_df.set_caption(title)
+            # Create a DataFrame with execution times and accuracies
+            results_df = pd.DataFrame(
+                {
+                    "Execution Time": execution_times,
+                    "Training Accuracy": {
+                        k: v["Training Accuracy"] for k, v in metrics_dict.items()
+                    },
+                    "Test Accuracy": {k: v["Test Accuracy"] for k, v in metrics_dict.items()},
+                }
+            ).transpose()
 
-            # Clear the cell output, because of tqdm bug widgets after reopen
-            clear_output(wait=True)
+            # Style the DataFrame to highlight the best values
+            styled_df = results_df.style.apply(
+                # self.highlight_best, order="min", axis=1, subset=["Execution Time"]
+                self.highlight_best,
+                order="min",
+                axis=1,
+                subset=pd.IndexSlice["Execution Time", :],
+            ).apply(
+                self.highlight_best,
+                order="max",
+                axis=1,
+                # subset=["Training Accuracy", "Test Accuracy"],
+                subset=pd.IndexSlice[["Training Accuracy", "Test Accuracy"], :],
+            )
 
+            # Print the styled DataFrame
             display(styled_df)
 
         return execution_times, metrics_dict
@@ -376,6 +394,7 @@ class Simulation:
         Run the experiment multiple times by generating a new dataset and initial theta each time.
         Track the execution times and last theta errors for all optimizers, with batch sizes determined by batch_size_power_list.
         Plot the execution times and errors for all optimizers in separate subplots with batch size on the x-axis.
+        If there is only one batch size, the results are stored in lists to make boxplots.
         Args:
             N (int): Number of simulations
             n (int): Number of samples in the dataset
@@ -440,6 +459,7 @@ class Simulation:
         N_runs_pbar.close()
 
         if len(self.batch_size_power_list) == 1:
+            self.batch_size_power = self.batch_size_power_list[0]
             self.boxplot_time_and_errors(all_execution_times, all_metrics, N)
         else:
             self.plot_time_and_errors(all_execution_times, all_metrics, N)
@@ -487,7 +507,7 @@ class Simulation:
         fig.text(0.0, 0.5, ylabel, va="center", rotation="vertical")
 
         plt.suptitle(
-            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch_size_power={self.batch_size_power}"
+            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size power={self.batch_size_power}"
         )
         plt.tight_layout(pad=3.0)
         plt.show()
@@ -507,17 +527,20 @@ class Simulation:
             self.plot_errors(all_hessian_inv_errors, ylabel, N)
 
     @staticmethod
-    def highlight_max(data):
+    def highlight_best(data, order: str):
         """
-        Highlight the maximum in a DataFrame or Series row with bold font
+        Highlight the minimum or maximum in a DataFrame or Series row with bold font
         """
+        if order not in ["min", "max"]:
+            raise ValueError("order must be 'min' or 'max'")
         attr = "font-weight: bold"
         if data.ndim == 1:  # Series from a DataFrame.apply(axis=1)
-            is_max = data == data.max()
-            return [attr if v else "" for v in is_max]
+            best = data.min() if order == "min" else data.max()
+            return [attr if v == best else "" for v in data]
         else:  # DataFrame direct styling
+            best = data.min(axis=1) if order == "min" else data.max(axis=1)
             return pd.DataFrame(
-                np.where(data == data.max(axis=1)[:, None], attr, ""),
+                np.where(data == best[:, None], attr, ""),
                 index=data.index,
                 columns=data.columns,
             )
@@ -564,7 +587,7 @@ class Simulation:
         fig.legend(handles=handles, loc="center left", bbox_to_anchor=(1.0, 0.5), ncol=1)
 
         plt.suptitle(
-            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size={self.batch_size_power_list}"
+            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size power={self.batch_size_power}"
         )
         plt.tight_layout(rect=[0, 0, 1, 1])  # Adjust layout to make room for the legend
         plt.show()
@@ -593,7 +616,7 @@ class Simulation:
             ax1.set_title(f"e={e}")
 
         plt.suptitle(
-            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size={self.batch_size_power_list}"
+            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size powers={self.batch_size_power_list}"
         )
         # plt.tight_layout(pad=3.0)
         plt.tight_layout()

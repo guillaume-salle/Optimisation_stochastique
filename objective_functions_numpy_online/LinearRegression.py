@@ -15,11 +15,9 @@ class LinearRegression(BaseObjectiveFunction):
 
     def __init__(self, bias: bool = True):
         self.bias = bias
-        self.name = "Linear model"
+        self.name = "Linear"
 
-    def __call__(
-        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
-    ) -> np.ndarray:
+    def __call__(self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray) -> np.ndarray:
         """
         Compute the linear regression loss, works with a batch or a single data point
         """
@@ -42,9 +40,7 @@ class LinearRegression(BaseObjectiveFunction):
         else:
             return X.shape[-1]
 
-    def grad(
-        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
-    ) -> np.ndarray:
+    def grad(self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray) -> np.ndarray:
         """
         Compute the gradient of the linear regression loss, works only for a single data point
         """
@@ -56,9 +52,7 @@ class LinearRegression(BaseObjectiveFunction):
         grad = (Y_pred - y) * X
         return grad
 
-    def hessian(
-        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
-    ) -> np.ndarray:
+    def hessian(self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray) -> np.ndarray:
         """
         Compute the Hessian of the linear regression loss, works only for a single data point
         """

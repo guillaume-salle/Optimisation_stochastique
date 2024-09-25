@@ -15,11 +15,9 @@ class LinearRegression(BaseObjectiveFunction):
 
     def __init__(self, bias: bool = True):
         self.bias = bias
-        self.name = "Linear model"
+        self.name = "Linear"
 
-    def __call__(
-        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray
-    ) -> np.ndarray:
+    def __call__(self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray) -> np.ndarray:
         """
         Compute the linear regression loss, works with a batch or a single data point
         """

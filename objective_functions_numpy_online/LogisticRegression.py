@@ -38,12 +38,10 @@ class LogisticRegression(BaseObjectiveFunction):
     """
 
     def __init__(self, bias: bool = True):
-        self.name = "Logistic model"
+        self.name = "Logistic"
         self.bias = bias
 
-    def __call__(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray
-    ) -> np.ndarray:
+    def __call__(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
         """
         Compute the logistic loss, works with a batch or a single data point
         """
@@ -56,9 +54,7 @@ class LogisticRegression(BaseObjectiveFunction):
         dot_product = np.dot(X, h)
         return np.log(1 + np.exp(dot_product)) - dot_product * y
 
-    def evaluate_accuracy(
-        self, dataset: MyDataset, h: np.ndarray, batch_size=512
-    ) -> float:
+    def evaluate_accuracy(self, dataset: MyDataset, h: np.ndarray, batch_size=512) -> float:
         """
         Compute the accuracy of the model
         """
