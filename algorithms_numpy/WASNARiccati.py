@@ -23,12 +23,12 @@ class WASNARiccati(BaseOptimizer):
         self.class_name = "WASNARiccati"
         self.name = (
             ("WASNARiccati" if tau_theta != 0.0 else "SNARiccati")
-            + (f" ν={nu}")
+            + (f" α={nu}")
             + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
             + (" NAT" if not compute_hessian_theta_avg else "")
         )
-        self.nu = nu
-        self.c_nu = c_nu
+        self.alpha = nu
+        self.c_alpha = c_nu
         self.tau_theta = tau_theta
         self.add_iter_theta = add_iter_theta
         self.lambda_ = lambda_
@@ -67,7 +67,7 @@ class WASNARiccati(BaseOptimizer):
         self.hessian_bar_inv += -np.outer(product, product) / denominator
 
         # Update the not averaged theta
-        learning_rate = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
+        learning_rate = self.c_alpha * (self.iter + self.add_iter_theta) ** (-self.alpha)
         self.theta_not_avg += (
             -learning_rate
             * (self.iter + self.lambda_ * self.theta_dim)

@@ -15,17 +15,17 @@ class WASGD(BaseOptimizer):
     def __init__(
         self,
         nu: float = 0.75,
-        c_nu: float = 5.0,
+        c_nu: float = 1.0,
         tau: float = 2.0,
         add_iter_theta: int = 200,
     ):
         self.name = (
             ("WASGD" if tau != 0.0 else "ASGD")
-            + (f" ν={nu}")
+            + (f" α={nu}")
             + (f" τ={tau}" if tau != 0.0 and tau != 2.0 else "")
         )
-        self.nu = nu
-        self.c_nu = c_nu
+        self.alpha = nu
+        self.c_alpha = c_nu
         self.tau = tau
         self.add_iter_theta = (
             add_iter_theta  # Dont start at 0 to avoid large learning rates at the beginning
@@ -52,7 +52,7 @@ class WASGD(BaseOptimizer):
         grad = g.grad(data, self.theta_not_averaged)
 
         # Update non averaged theta
-        learning_rate = self.c_nu * ((self.iter + self.add_iter_theta) ** (-self.nu))
+        learning_rate = self.c_alpha * ((self.iter + self.add_iter_theta) ** (-self.alpha))
         self.theta_not_averaged += -learning_rate * grad
 
         # Update averaged theta

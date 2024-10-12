@@ -22,12 +22,12 @@ class WASNA(BaseOptimizer):
     ):
         self.name = (
             ("WASNA" if tau_theta != 0.0 else "SNA*")
-            + (f" ν={nu}")
+            + (f" α={nu}")
             + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
             + (" NAT" if not compute_hessian_theta_avg else "")
         )
-        self.nu = nu
-        self.c_nu = c_nu
+        self.alpha = nu
+        self.c_alpha = c_nu
         self.tau_theta = tau_theta
         self.add_iter_theta = add_iter_theta
         self.lambda_ = lambda_
@@ -62,12 +62,10 @@ class WASNA(BaseOptimizer):
 
         # Update the hessian estimate
         self.hessian_bar += hessian
-        hessian_inv = np.linalg.inv(
-            self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
-        )
+        hessian_inv = np.linalg.inv(self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim))
 
         # Update the theta estimate
-        learning_rate = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
+        learning_rate = self.c_alpha * (self.iter + self.add_iter_theta) ** (-self.alpha)
         self.theta_not_avg += -learning_rate * hessian_inv @ grad
         weight_theta = math.log(self.iter + 1) ** self.tau_theta
         self.sum_weights_theta += weight_theta

@@ -11,6 +11,7 @@ class UWASNA(BaseOptimizer):
     Universal Stochastic Newton Algorithm optimizer
     """
 
+    # Heriter de la classe USNA
     def __init__(
         self,
         nu: float = 0.75,  # Do not use 1 for averaged algo
@@ -25,24 +26,25 @@ class UWASNA(BaseOptimizer):
         compute_hessian_theta_avg: bool = True,  # Where to compute the hessian
         use_hessian_avg: bool = True,  # Use the averaged hessian
         sym: bool = True,  # Symmetric estimate of the hessian
-        algo: str = "article",
+        algo: str = "rapport",  # Version of UWASNA described in the rapport, by default
     ):
         self.name = (
             ("UWASNA" if (tau_theta != 0.0 or tau_hessian != 0.0) else "USNA")
-            + (f" ν={nu}")
+            + (f" α={nu}")
             + (f" γ={gamma}")
             + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
             + (f" τ_hessian={tau_hessian}" if tau_hessian != 2.0 and tau_theta != 0.0 else "")
+            + (" " + algo if algo != "rapport" else "")
             + (" Z~" + generate_Z if generate_Z != "canonic" else "")
             + (" NAT" if not compute_hessian_theta_avg else "")
             + (" NAH" if not use_hessian_avg else "")
             + (" NS" if not sym else "")
-            + (" " + algo if algo != "article" else "")
         )
-        self.nu = nu
-        self.c_nu = c_nu
+        self.alpha = nu
+        self.c_alpha = c_nu
         self.gamma = gamma
         self.c_gamma = c_gamma
+        self.generate_Z = generate_Z
         self.tau_theta = tau_theta
         self.tau_hessian = tau_hessian
         self.add_iter_theta = add_iter_theta
@@ -52,22 +54,31 @@ class UWASNA(BaseOptimizer):
         self.sym = sym
         self.algo = algo
 
-        # If Z is a random vector of canonic base, we can compute faster P and Q
-        self.generate_Z = generate_Z
+        # Test different versions of the algorithm
+        # 'article', 'article v2' for the revised version with frobenius ball projection
+        # 'rapport' for the added term with left multiplication by ZZ^T, 'right' for right multiplication
+        # 'proj' for left multiplication and ZZ^T au lieu de Id, not studied in theory yet
+        versions = ["article", "article v2", "rapport", "right", "proj"]
+        if algo not in versions:
+            raise ValueError("Invalid value for algo. Choose " + ", ".join(versions) + ".")
+
+        # In case we know Z is a random vector of canonic base, we can compute faster P and Q
         if generate_Z == "normal":
             self.update_hessian = self.update_hessian_normal
+            if self.algo == "rapport" or self.algo == "proj":
+                raise ValueError(
+                    "Invalid value for algo. No point in multiplying on the left with a normal vector."
+                )
         elif generate_Z == "canonic" or generate_Z == "canonic deterministic":
-            self.update_hessian = self.update_hessian_canonic
+            # Different fonction if we multiply by Z Z^T on the left or on the right
+            if self.algo == "rapport" or self.algo == "proj":
+                self.update_hessian = self.update_hessian_canonic_left
+            else:
+                self.update_hessian = self.update_hessian_canonic_right
         else:
             raise ValueError(
                 "Invalid value for Z. Choose 'normal', 'canonic' or 'canonic deterministic'."
             )
-
-        # TODO DELETE
-        if algo not in ["article", "bruno", "guillaume"]:
-            raise ValueError("Invalid value for algo. Choose 'article', 'bruno' or 'guillaume'.")
-        if algo == "guillaume":
-            self.update_hessian = self.update_hessian_guillaume
 
     def reset(self, initial_theta: np.ndarray):
         """
@@ -111,7 +122,7 @@ class UWASNA(BaseOptimizer):
                 / self.sum_weights_hessian
             )
 
-        learning_rate_theta = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
+        learning_rate_theta = self.c_alpha * (self.iter + self.add_iter_theta) ** (-self.alpha)
         if self.use_hessian_avg:
             self.theta_not_avg += -learning_rate_theta * self.hessian_inv @ grad
         else:
@@ -119,6 +130,9 @@ class UWASNA(BaseOptimizer):
         weight_theta = math.log(self.iter + 1) ** self.tau_theta
         self.sum_weights_theta += weight_theta
         theta += (self.theta_not_avg - theta) * weight_theta / self.sum_weights_theta
+
+    # The rest is almost copied from USNA
+    # TODO: factorize code
 
     def update_hessian_normal(
         self,
@@ -139,10 +153,11 @@ class UWASNA(BaseOptimizer):
         Q = hessian @ Z
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
-        # TODO: check if the condition is correct
-        # if np.dot(Q, Q) * np.dot(Z, P) <= beta**2:
+
         if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
             product = np.outer(P, Q)
+
+            # Article version before revision
             if self.algo == "article":
                 if self.sym:
                     self.hessian_inv_not_avg += -learning_rate_hessian * (
@@ -150,19 +165,51 @@ class UWASNA(BaseOptimizer):
                     )
                 else:
                     self.hessian_inv_not_avg += -learning_rate_hessian * (
-                        product.transpose() - np.eye(self.theta_dim)
+                        product - np.eye(self.theta_dim)
                     )
-            elif self.algo == "bruno":
-                self.hessian_inv_not_avg += -learning_rate_hessian * (
-                    product + product.transpose() - 2 * np.eye(self.theta_dim)
-                ) + learning_rate_hessian**2 * np.einsum(
-                    "i,ij,j", Z, self.hessian_inv_not_avg, Z
-                ) * np.outer(
-                    Q, Q
+
+            # Article version after revision
+            elif self.algo == "article v2":
+                if self.sym:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product + product.transpose() - 2 * np.eye(self.theta_dim)
+                    )
+                else:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product - np.eye(self.theta_dim)
+                    )
+                norm = np.linalg.norm(self.hessian_inv_not_avg, ord="fro")
+                # beta'_n := gamma_n / (beta_n)^2 = 1 / (4 * learning_rate_hessian)
+                beta_prime = 1 / (4 * learning_rate_hessian)
+                if norm > beta_prime:
+                    self.hessian_inv_not_avg *= beta_prime / norm
+
+            # Version with added term to ensure positive definiteness like in rapport, but right multiplication
+            elif self.algo == "right":
+                if self.sym:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product + product.transpose() - 2 * np.eye(self.theta_dim)
+                    ) + learning_rate_hessian**2 * np.einsum(
+                        "i,ij,j", Z, self.hessian_inv_not_avg, Z
+                    ) * np.outer(
+                        Q, Q
+                    )
+                else:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product - np.eye(self.theta_dim)
+                    ) + learning_rate_hessian**2 * np.einsum(
+                        "i,ij,j", Z, self.hessian_inv_not_avg, Z
+                    ) * np.outer(
+                        Q, Q
+                    )
+            else:
+                raise ValueError(
+                    "Invalid value for algo. Choose 'article', 'article v2' or 'right'."
                 )
+
         return grad
 
-    def update_hessian_canonic(
+    def update_hessian_canonic_right(
         self,
         g: BaseObjectiveFunction,
         data: np.ndarray | Tuple[np.ndarray, np.ndarray],
@@ -170,7 +217,9 @@ class UWASNA(BaseOptimizer):
     ):
         """
         Update the not averaged hessian estimate with a canonic base random vector, also returns grad
+        Old version, the multiplication by Z Z^T is done on the RIGHT of the random hessian h_t
         """
+        # Generate Z
         if self.generate_Z == "canonic":
             z = np.random.randint(0, self.theta_dim)
         elif self.generate_Z == "canonic deterministic":
@@ -179,20 +228,21 @@ class UWASNA(BaseOptimizer):
         else:
             raise ValueError("Invalid value for Z. Choose 'canonic' or 'canonic deterministic'.")
 
+        # Compute vectors P and Q
         if self.compute_hessian_theta_avg:  # cf article
             grad = g.grad(data, self.theta_not_avg)
             Q = g.hessian_column(data, theta, z)
         else:
             grad, Q = g.grad_and_hessian_column(data, self.theta_not_avg, z)
-
         # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later
         P = self.hessian_inv_not_avg[:, z]  # Use the non averaged hessian to compute P
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
-        # TODO: Check if the condition is correct
-        # if np.dot(Q, Q) * self.theta_dim**2 * P[z] <= beta**2:
+
         if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
             product = self.theta_dim * np.outer(P, Q)  # Multiply by the dimension
+
+            # Article version before revision
             if self.algo == "article":
                 if self.sym:
                     self.hessian_inv_not_avg += -learning_rate_hessian * (
@@ -200,19 +250,40 @@ class UWASNA(BaseOptimizer):
                     )
                 else:
                     self.hessian_inv_not_avg += -learning_rate_hessian * (
-                        product.transpose() - np.eye(self.theta_dim)
+                        product - np.eye(self.theta_dim)
                     )
-            elif self.algo == "bruno":
-                self.hessian_inv_not_avg += -learning_rate_hessian * (
-                    product + product.transpose() - 2 * np.eye(self.theta_dim)
-                ) + learning_rate_hessian**2 * np.einsum(
-                    "i,ij,j", P, self.hessian_inv_not_avg, P
-                ) * np.outer(
-                    Q, Q
-                )
+
+            # Article version after revision
+            elif self.algo == "article v2":
+                if self.sym:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product + product.transpose() - 2 * np.eye(self.theta_dim)
+                    )
+                else:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product - np.eye(self.theta_dim)
+                    )
+
+                # Projection step:
+                norm = np.linalg.norm(self.hessian_inv_not_avg, ord="fro")
+                # beta'_n := gamma_n / (beta_n)^2 = 1 / (4 * learning_rate_hessian)
+                if norm > 1 / (4 * learning_rate_hessian):
+                    self.hessian_inv_not_avg /= norm
+
+            # version with added term to ensure positive definiteness
+            elif self.algo == "right":
+                if self.sym:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product + product.transpose() - 2 * np.eye(self.theta_dim)
+                    ) + learning_rate_hessian**2 * P[z] * np.outer(Q, Q)
+                else:
+                    self.hessian_inv_not_avg += -learning_rate_hessian * (
+                        product - np.eye(self.theta_dim)
+                    ) + learning_rate_hessian**2 * P[z] * np.outer(Q, Q)
+
         return grad
 
-    def update_hessian_canonic(
+    def update_hessian_canonic_left(
         self,
         g: BaseObjectiveFunction,
         data: np.ndarray | Tuple[np.ndarray, np.ndarray],
@@ -220,7 +291,10 @@ class UWASNA(BaseOptimizer):
     ):
         """
         Update the not averaged hessian estimate with a canonic base random vector, also returns grad
+        New version, the multiplication by Z Z^T is done on the LEFT of the random hessian h_t
+        Also new projected version, close to multiply on left so i put it here, not studied yet
         """
+        # Generate Z
         if self.generate_Z == "canonic":
             z = np.random.randint(0, self.theta_dim)
         elif self.generate_Z == "canonic deterministic":
@@ -229,23 +303,40 @@ class UWASNA(BaseOptimizer):
         else:
             raise ValueError("Invalid value for Z. Choose 'canonic' or 'canonic deterministic'.")
 
+        # TODO: we want a line here, not a column. Do a grad_and_hessian_iine function
+        # It is the same if random hessians are symmetric, which is the case in our simulations.
         if self.compute_hessian_theta_avg:  # cf article
             grad = g.grad(data, self.theta_not_avg)
             Q = g.hessian_column(data, theta, z)
         else:
             grad, Q = g.grad_and_hessian_column(data, self.theta_not_avg, z)
-
         # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later
         learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
         beta = 1 / (2 * learning_rate_hessian)
 
-        # TODO: Check if the condition is correct
         if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
-            # if np.dot(Q, Q) * self.theta_dim**2 * P[z] <= beta**2:
             product = self.theta_dim * Q.T @ self.hessian_inv_not_avg
-            product[z] -= self.theta_dim
-            self.hessian_inv_not_avg[z, :] += -learning_rate_hessian * product
-            if self.sym:
-                self.hessian_inv_not_avg[:, z] += -learning_rate_hessian * product
+
+            # rapport version, with the added term and the left multiplication by ZZ^T
+            if self.algo == "rapport":
+                self.hessian_inv_not_avg[z, :] += -learning_rate_hessian * product
+                if self.sym:
+                    self.hessian_inv_not_avg[:, z] += -learning_rate_hessian * product
+                self.hessian_inv_not_avg += (
+                    (1 + self.sym) * learning_rate_hessian * np.eye(self.theta_dim)
+                )
+                self.hessian_inv_not_avg[z, z] += learning_rate_hessian**2 * np.einsum(
+                    "i,ij,j", Q, self.hessian_inv_not_avg, Q
+                )
+
+            # Z Z^T replace Id, on top of rapport version
+            elif self.algo == "proj":
+                product[z] += -self.theta_dim
+                self.hessian_inv_not_avg[z, :] += -learning_rate_hessian * product
+                if self.sym:
+                    self.hessian_inv_not_avg[:, z] += -learning_rate_hessian * product
+                self.hessian_inv_not_avg[z, z] += learning_rate_hessian**2 * np.einsum(
+                    "i,ij,j", Q, self.hessian_inv_not_avg, Q
+                )
 
         return grad

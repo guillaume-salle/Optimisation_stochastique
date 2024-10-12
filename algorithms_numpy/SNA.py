@@ -17,9 +17,9 @@ class SNA(BaseOptimizer):
         add_iter_theta: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
     ):
-        self.name = "SNA" + f" ν={nu}"
-        self.nu = nu
-        self.c_nu = c_nu
+        self.name = "SNA" + f" α={nu}"
+        self.alpha = nu
+        self.alpha = c_nu
         self.add_iter_theta = add_iter_theta
         self.lambda_ = lambda_
 
@@ -43,8 +43,6 @@ class SNA(BaseOptimizer):
         self.iter += 1
         grad, hessian = g.grad_and_hessian(data, theta)
         self.hessian_bar += hessian
-        hessian_inv = np.linalg.inv(
-            self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim)
-        )
-        learning_rate = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
+        hessian_inv = np.linalg.inv(self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim))
+        learning_rate = self.alpha * (self.iter + self.add_iter_theta) ** (-self.alpha)
         theta += -learning_rate * hessian_inv @ grad

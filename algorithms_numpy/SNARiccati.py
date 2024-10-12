@@ -17,9 +17,9 @@ class SNARiccati(BaseOptimizer):
         add_iter_theta: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
     ):
-        self.name = "SNARiccati" + f" ν={nu}"
-        self.nu = nu
-        self.c_nu = c_nu
+        self.name = "SNARiccati" + f" α={nu}"
+        self.alpha = nu
+        self.c_alpha = c_nu
         self.add_iter_theta = add_iter_theta
         self.lambda_ = lambda_
 
@@ -46,7 +46,7 @@ class SNARiccati(BaseOptimizer):
         product = self.hessian_bar_inv @ phi
         denominator = 1 + np.dot(phi, product)
         self.hessian_bar_inv += -np.outer(product, product) / denominator
-        learning_rate = self.c_nu * (self.iter + self.add_iter_theta) ** (-self.nu)
+        learning_rate = self.c_alpha * (self.iter + self.add_iter_theta) ** (-self.alpha)
         theta_estimate += (
             -learning_rate
             * (self.iter + self.lambda_ * self.theta_dim)

@@ -323,6 +323,7 @@ class Simulation:
 
             # Print the styled DataFrame
             display(styled_df)
+            self.stored_accuracies = styled_df
 
         return execution_times, metrics_dict
 
@@ -481,10 +482,17 @@ class Simulation:
 
         for ax, (e, errors_dict) in zip(axes, all_errors_avg.items()):
             markers = cycle(["3", "x", "+"])
+
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_xlabel("Sample size")
+            ax.set_title(f"e={e}")
+
             for idx, (name, errors) in enumerate(errors_dict.items()):
                 # Multiply the x-axis values by batch_size
                 batch_size = int(len(self.theta) ** self.batch_size_power_list[0])
                 x_values = np.arange(0, len(errors) * batch_size, batch_size)
+
                 # Markers to distinguish the optimizers
                 markevery = (idx / len(errors_dict), 0.2)
                 ax.plot(
@@ -496,10 +504,6 @@ class Simulation:
                     markevery=markevery,
                 )
 
-            ax.set_xscale("log")
-            ax.set_yscale("log")
-            ax.set_xlabel("Sample size")
-            ax.set_title(f"e={e}")
             ax.legend(loc="lower left")
 
         # Adjust layout to provide space for ylabel

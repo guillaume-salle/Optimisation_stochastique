@@ -1,7 +1,8 @@
 import numpy as np
 from functools import partial
 
-import algorithms_numpy as algorithms
+import algorithms_numpy as algo
+
 from objective_functions_numpy_streaming import (
     LinearRegression,
     LogisticRegression,
@@ -21,8 +22,8 @@ from datasets_numpy import (
 
 
 # Configuration for the number of runs and size of data
-N = 10
-n = int(1e4)
+N = 20
+n = int(1e5)
 batch_size_power = 1
 batch_size_power_list = [1]
 
