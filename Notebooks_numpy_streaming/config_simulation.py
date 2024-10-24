@@ -22,14 +22,14 @@ from datasets_numpy import (
 
 
 # Configuration for the number of runs and size of data
-N = 20
-n = int(1e5)
+N = 10
+n = int(1e4)
 batch_size_power = 1
 batch_size_power_list = [1]
 
 # Configuration for true theta
 # Value from the article:
-true_theta = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
+true_theta = np.array([1.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
 # true_theta = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0])  # Slides, bias=False
 # true_theta = torch.tensor([1, 1, 1, 1, 1])  # Poly, bias=False
 
