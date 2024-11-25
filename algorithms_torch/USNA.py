@@ -13,8 +13,8 @@ class USNA(BaseOptimizer):
 
     def __init__(
         self,
-        nu: float = 1.0,  # Set to 1.0 in the article
-        c_nu: float = 1.0,  # Set to 1.0 in the article
+        alpha: float = 1.0,  # Set to 1.0 in the article
+        c_alpha: float = 1.0,  # Set to 1.0 in the article
         gamma: float = 0.75,  # Set to 0.75 in the article
         c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
         generate_Z: str = "canonic",
@@ -23,12 +23,12 @@ class USNA(BaseOptimizer):
     ):
         self.name = (
             "USNA"
-            + (f" ν={nu}")
+            + (f" ν={alpha}")
             + (f" γ={gamma}")
             + (" Z~" + generate_Z if generate_Z != "normal" else "")
         )
-        self.nu = nu
-        self.c_nu = c_nu
+        self.nu = alpha
+        self.c_nu = c_alpha
         self.gamma = gamma
         self.c_gamma = c_gamma
         self.add_iter_theta = add_iter_theta

@@ -11,10 +11,10 @@ class SGD(BaseOptimizer):
     Uses a learning rate lr = c_mu * iteration^(-mu)
     """
 
-    def __init__(self, nu: float, c_nu: float = 1.0, add_iter_theta: int = 20):
-        self.name = "SGD" + f" ν={nu}"
-        self.nu = nu
-        self.c_nu = c_nu
+    def __init__(self, alpha: float, c_alpha: float = 1.0, add_iter_theta: int = 20):
+        self.name = "SGD" + f" ν={alpha}"
+        self.nu = alpha
+        self.c_nu = c_alpha
         self.add_iter_theta = (
             add_iter_theta  # Dont start at 0 to avoid large learning rates at the beginning
         )

@@ -36,7 +36,7 @@ true_theta = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
 # Whether or not a bias term is included
 bias_setting = True
 
-nu_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
+alpha_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 gamma_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 e_values = [1, 2]
 

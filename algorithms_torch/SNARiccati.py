@@ -12,14 +12,14 @@ class SNARiccati(BaseOptimizer):
 
     def __init__(
         self,
-        nu: float,
-        c_nu: float = 1.0,
+        alpha: float,
+        c_alpha: float = 1.0,
         add_iter_theta: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
     ):
-        self.name = "SNARiccati" + f" ν={nu}"
-        self.nu = nu
-        self.c_nu = c_nu
+        self.name = "SNARiccati" + f" ν={alpha}"
+        self.nu = alpha
+        self.c_nu = c_alpha
         self.add_iter_theta = add_iter_theta
         self.lambda_ = lambda_
 

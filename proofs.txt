@@ -1,0 +1,36 @@
+borne sur plus grande valeur propre
+	utilise
+		borne sur norme de h_t
+	utilisé dans
+		thm rate CV A_t en supposant rate CV theta_t
+
+thm rate CV A_t en supposant rate CV theta_t
+	utilise
+		borne sur plus grande valeur propre pour controler
+		le terme en ??
+	utilisé dans
+		thm rate CV theta_t dans USNA
+
+strong consistency of USNA
+	utilise
+	utilisé dans
+		thm rate CV theta_t dans USNA
+
+borne sur plus petite valeur propre
+	utilise
+	utilisé dans
+
+thm rate CV theta_t dans USNA
+	strong consistency of USNA
+	thm 4.3 Boyer et Godichon
+	thm rate CV A_t en supposant rate CV theta_t
+
+thm rate CV averaged theta_t dans USNA
+	??
+
+thm rate CV A_t dans UWASNA
+	thm rate CV theta_t dans USNA
+
+thm rate CV averaged A_t dans UWASNA
+	??
+

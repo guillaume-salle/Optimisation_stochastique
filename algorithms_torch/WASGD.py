@@ -14,19 +14,19 @@ class WASGD(BaseOptimizer):
 
     def __init__(
         self,
-        nu: float,
-        c_mu: float = 1.0,
+        alpha: float,
+        c_alpha: float = 1.0,
         tau: float = 2.0,
         add_iter_theta: int = 20,
         device: str = None,
     ):
         self.name = (
             ("WASGD" if tau != 0.0 else "ASGD")
-            + (f" ν={nu}")
+            + (f" ν={alpha}")
             + (f" τ={tau}" if tau != 2.0 and tau != 0.0 else "")
         )
-        self.nu = nu
-        self.c_nu = c_mu
+        self.nu = alpha
+        self.c_nu = c_alpha
         self.tau = tau
         self.add_iter_theta = (
             add_iter_theta  # Dont start at 0 to avoid large learning rates at the beginning

@@ -1,48 +1,122 @@
 import numpy as np
+import math
 from typing import Tuple
 
-from algorithms_torch import BaseOptimizer
+from algorithms_numpy import BaseOptimizer
 from objective_functions_numpy_online import BaseObjectiveFunction
 
 
 class SNA(BaseOptimizer):
     """
     Stochastic Newton Algorithm optimizer
+    Uses a learning rate lr = lr_const * (n_iter + lr_add_iter)^(-lr_exp) for optimization.
+    Averaged parameter can be calculated with a logarithmic weight, i.e. the weight is
+    calculated as log(n_iter+1)^weight_exp.
+
+    Parameters:
+    param (np.ndarray): Initial parameters for the optimizer.
+    lr_exp (float): Exponent for learning rate decay.
+    lr_const (float): Constant multiplier for learning rate.
+    lr_add_iter (int): Additional iterations for learning rate calculation.
+    averaged (bool): Whether to use an averaged parameter.
+    weight_exp (float): Exponent for the logarithmic weight.
     """
 
     def __init__(
         self,
-        nu: float = 1.0,
-        c_nu: float = 1.0,
-        add_iter_theta: int = 20,
-        lambda_: float = 10.0,  # Weight more the initial identity matrix by lambda_ * d
+        param: np.ndarray,
+        lr_exp: float = 1.0,
+        lr_const: float = 1.0,
+        lr_add_iter: int = 20,
+        identity_weight: int = 100,  # Weight more the initial identity matrix
+        averaged: bool = False,  # Whether to use an averaged parameter
+        weight_exp: float = 2.0,  # Exponent for the logarithmic weight
+        compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
+        compute_inverse: bool = False,  # Actually compute inverse, or just solve the system
+        sherman_morrison: bool = False,  # Whether to use the Sherman-Morrison formula
     ):
-        self.name = "SNA" + f" α={nu}"
-        self.alpha = nu
-        self.alpha = c_nu
-        self.add_iter_theta = add_iter_theta
-        self.lambda_ = lambda_
+        self.name = (
+            ("WASNA" if weight_exp != 0.0 else "SNA*")
+            + (f" α={lr_exp}")
+            + (f" τ_theta={weight_exp}" if weight_exp != 2.0 and weight_exp != 0.0 else "")
+            + (" NAP" if not compute_hessian_param_avg else "")  # NAP = Not Averaged Parameter
+        )
+        self.lr_exp = lr_exp
+        self.lr_const = lr_const
+        self.lr_add_iter = lr_add_iter
+        self.identity_weight = identity_weight
+        self.compute_hessian_param_avg = compute_hessian_param_avg
+        self.compute_inverse = compute_inverse
+        self.sherman_morrison = sherman_morrison
 
-    def reset(self, initial_theta: np.ndarray):
-        """
-        Reset the learning rate and estimate of the hessian
-        """
-        self.iter = 0
-        self.theta_dim = initial_theta.shape[0]
-        self.hessian_bar = self.lambda_ * self.theta_dim * np.eye(self.theta_dim)
+        if sherman_morrison:
+            self.step = self.step_sherman_morrison
+            self.hessian_inv = np.eye(param.shape[0])
+        else:
+            self.hessian_bar = np.eye(param.shape[0])
+            if compute_inverse:
+                self.hessian_inv = np.eye(param.shape[0])
+
+        super().__init__(param, averaged, weight_exp)
 
     def step(
         self,
         data: np.ndarray | Tuple[np.ndarray, np.ndarray],
-        theta: np.ndarray,
-        g: BaseObjectiveFunction,
     ):
         """
         Perform one optimization step
+
+        Args:
+            data (np.ndarray | Tuple[np.ndarray, np.ndarray]): The input data for the optimization step.
         """
-        self.iter += 1
-        grad, hessian = g.grad_and_hessian(data, theta)
-        self.hessian_bar += hessian
-        hessian_inv = np.linalg.inv(self.hessian_bar / (self.iter + self.lambda_ * self.theta_dim))
-        learning_rate = self.alpha * (self.iter + self.add_iter_theta) ** (-self.alpha)
-        theta += -learning_rate * hessian_inv @ grad
+        self.n_iter += 1
+        # Compute the gradient and Hessian of the objective function
+        if self.compute_hessian_param_avg:  # cf article
+            grad = self.objective_function.grad(data, self.param_not_averaged)
+            hessian = self.objective_function.hessian(data, self.param)
+        else:  # faster, allow to re-ure the grad from hessian computation
+            grad, hessian = self.objective_function.grad_and_hessian(data, self.param_not_averaged)
+
+        # Update the running average of the Hessian
+        n_matrix = self.n_iter + self.identity_weight
+        self.hessian_bar = ((n_matrix - 1) / n_matrix) * self.hessian_bar + hessian / n_matrix
+
+        # Update the non averaged parameter
+        learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
+        if self.compute_inverse:
+            self.hessian_inv = np.linalg.inv(self.hessian_bar)
+            self.param_not_averaged -= learning_rate * self.hessian_inv @ grad
+        else:  # faster and more stable, no need to compute the whole inverse
+            self.param_not_averaged -= learning_rate * np.linalg.solve(self.hessian_bar, grad)
+
+        self.update_averaged_param()
+
+    def step_sherman_morrison(
+        self,
+        data: np.ndarray | Tuple[np.ndarray, np.ndarray],
+    ):
+        """
+        Perform one optimization step using the Sherman-Morrison formula
+
+        Args:
+            data (np.ndarray | Tuple[np.ndarray, np.ndarray]): The input data for the optimization step.
+        """
+        self.n_iter += 1
+        if self.compute_hessian_param_avg:  # cf article
+            grad = self.objective_function.grad(data, self.param_not_averaged)
+            phi = self.objective_function.riccati(data, self.param)
+        else:  # faster, allow to re-ure the grad from hessian computation
+            grad, phi = self.objective_function.grad_and_riccati(data, self.param_not_averaged)
+
+        # Update the inverse Hessian matrix using the Sherman-Morrison equation
+        n_matrix = self.n_iter + self.identity_weight
+        product = np.dot(self.hessian_inv, phi) / n_matrix
+        self.hessian_inv -= (1 / n_matrix) * self.hessian_inv + np.outer(
+            product, product / (n_matrix ** (-1) + np.dot(phi, product))
+        )
+
+        # Update the non averaged parameter
+        learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
+        self.param_not_averaged -= learning_rate * self.hessian_inv @ grad
+
+        self.update_averaged_param()

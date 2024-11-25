@@ -13,8 +13,8 @@ class WASNA(BaseOptimizer):
 
     def __init__(
         self,
-        nu: float = 0.66,
-        c_nu: float = 1.0,
+        alpha: float = 0.66,
+        c_alpha: float = 1.0,
         tau_theta: float = 2.0,
         add_iter_theta: int = 20,
         lambda_: float = 10.0,  # Weight more the initial identity matrix
@@ -22,11 +22,11 @@ class WASNA(BaseOptimizer):
     ):
         self.name = (
             ("WASNA" if tau_theta != 0.0 else "SNA*")
-            + (f" ν={nu}")
+            + (f" ν={alpha}")
             + (f" τ_theta={tau_theta}" if tau_theta != 2.0 and tau_theta != 0.0 else "")
         )
-        self.nu = nu
-        self.c_nu = c_nu
+        self.nu = alpha
+        self.c_nu = c_alpha
         self.tau_theta = tau_theta
         self.add_iter_theta = add_iter_theta
         self.lambda_ = lambda_

@@ -7,281 +7,111 @@ from objective_functions_numpy_online import BaseObjectiveFunction
 
 class USNA(BaseOptimizer):
     """
-    Universal Stochastic Newton Algorithm optimizer
+    Universal Stochastic Newton Algorithm optimizer, version described in the internship report.
     """
 
     def __init__(
         self,
-        # TODO: change nu to alpha in other files
-        nu: float = 1.0,  # Set to 1.0 in the article
-        c_nu: float = 1.0,  # Set to 1.0 in the article
-        gamma: float = 0.75,  # Set to 0.75 in the article
-        c_gamma: float = 0.1,  # Not specified in the article, and 1.0 diverges
-        generate_Z: str = "canonic",
-        add_iter_theta: int = 20,
-        add_iter_hessian: int = 200,  # Works better
-        sym: bool = True,  # Symmetric estimate of the hessian
-        algo: str = "rapport",  # Version of USNA described in the rapport, by default
+        param: np.ndarray,
+        objective_function: BaseObjectiveFunction,
+        lr_exp: float = 1.0,
+        lr_const: float = 1.0,
+        lr_add_iter: int = 20,  # No specified in the article
+        lr_hess_exp: float = 0.75,
+        lr_hess_const: float = 0.1,  # Not specified in the article, and 1.0 diverges
+        lr_hess_add_iter: int = 200,  # Not specified, Works better
+        averaged: bool = False,  # Whether to use an averaged parameter
+        weight_exp: float = 2.0,  # Exponent for the logarithmic weight
+        averaged_matrix: bool = False,  # Wether to use an averaged estimate of the inverse hessian
+        weight_exp_matrix: float = 2.0,  # Exponent for the logarithmic weight of the averaged inverse hessian
+        compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
     ):
         self.name = (
-            "USNA"
-            + (f" α={nu}")
-            + (f" γ={gamma}" if gamma != 0.75 else "")
-            + (" " + algo if algo != "rapport" else "")
-            + (" Z~" + generate_Z if generate_Z != "canonic" else "")
-            + (" NS" if not sym else "")
+            "U"
+            + ("W" if averaged and weight_exp != 0.0 else "")
+            + ("A" if averaged else "")
+            + "SNA"
+            + (f" α={lr_exp}")
+            + (f" γ={lr_hess_exp}" if lr_hess_exp != 0.75 else "")
         )
-        self.alpha = nu
-        self.c_alpha = c_nu
-        self.gamma = gamma
-        self.c_gamma = c_gamma
-        self.generate_Z = generate_Z
-        self.add_iter_theta = add_iter_theta
-        self.add_iter_hessian = add_iter_hessian
-        self.sym = sym
-        self.algo = algo
+        self.lr_exp = lr_exp
+        self.lr_const = lr_const
+        self.lr_add_iter = lr_add_iter
+        self.lr_hess_exp = lr_hess_exp
+        self.lr_hess_const = lr_hess_const
+        self.lr_hess_add_iter = lr_hess_add_iter
+        self.averaged_matrix = averaged_matrix
+        self.weight_exp_matrix = weight_exp_matrix
+        self.compute_hessian_param_avg = compute_hessian_param_avg
 
-        # Test different versions of the algorithm
-        # 'article', 'article v2' for the revised version with frobenius ball projection
-        # 'rapport' for the added term with left multiplication by ZZ^T, 'right' for right multiplication
-        # 'proj' for left multiplication and ZZ^T au lieu de Id, not studied in theory yet
-        versions = ["article", "article v2", "rapport", "right", "proj"]
-        if algo not in versions:
-            raise ValueError("Invalid value for algo. Choose " + ", ".join(versions) + ".")
+        self.matrix = np.eye(param.shape[0])
+        self.matrix_not_avg = np.copy(self.matrix) if averaged_matrix else self.matrix
+        self.param_dim = param.shape[0]
 
-        # In case we know Z is a random vector of canonic base, we can compute faster P and Q
-        if generate_Z == "normal":
-            self.update_hessian = self.update_hessian_normal
-            if self.algo == "rapport" or self.algo == "proj":
-                raise ValueError(
-                    "Invalid value for algo. No point in multiplying on the left with a normal vector."
-                )
-        elif generate_Z == "canonic" or generate_Z == "canonic deterministic":
-            # Different fonction if we multiply by Z Z^T on the left or on the right
-            if self.algo == "rapport" or self.algo == "proj":
-                self.update_hessian = self.update_hessian_canonic_left
-            else:
-                self.update_hessian = self.update_hessian_canonic_right
-        else:
-            raise ValueError(
-                "Invalid value for Z. Choose 'normal', 'canonic' or 'canonic deterministic'."
-            )
-
-    def reset(self, initial_theta: np.ndarray):
-        """
-        Reset the learning rate and estimate of the hessian
-        """
-        self.iter = 0
-        self.theta_dim = initial_theta.shape[0]
-        self.hessian_inv = np.eye(self.theta_dim)
-        if self.generate_Z == "canonic deterministic":
-            self.k = 0
+        super().__init__(param, objective_function, averaged, weight_exp)
 
     def step(
         self,
         data: np.ndarray | Tuple[np.ndarray, np.ndarray],
-        theta: np.ndarray,
-        g: BaseObjectiveFunction,
     ):
         """
         Perform one optimization step
+
+        Args:
+            data (np.ndarray | Tuple[np.ndarray, np.ndarray]): The input data for the optimization step.
         """
-        self.iter += 1
+        self.n_iter += 1
 
         # Update the hessian estimate and get the gradient from intermediate computation
-        grad = self.update_hessian(g, data, theta)
+        grad = self.update_hessian(self.objective_function, data)
 
         # Update theta
-        learning_rate_theta = self.c_alpha * (self.iter + self.add_iter_theta) ** (-self.alpha)
-        theta += -learning_rate_theta * self.hessian_inv @ grad
+        learning_rate_theta = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
+        self.param -= learning_rate_theta * self.matrix @ grad
 
-    def update_hessian_normal(
+        self.update_averaged_param()
+        self.update_averaged_matrix()
+
+    def update_hessian(
         self,
-        g: BaseObjectiveFunction,
         data: np.ndarray | Tuple[np.ndarray, np.ndarray],
-        theta: np.ndarray,
-    ) -> np.ndarray:
-        """
-        Update the hessian estimate with a normal random vector, also returns grad
-        """
-        grad, hessian = g.grad_and_hessian(data, theta)
-        Z = np.random.standard_normal(self.theta_dim)
-        P = self.hessian_inv @ Z
-        Q = hessian @ Z
-        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
-        beta = 1 / (2 * learning_rate_hessian)
-
-        if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
-            product = np.outer(Q, P)
-
-            # Article version before revision
-            if self.algo == "article":
-                if self.sym:
-                    self.hessian_inv += -learning_rate_hessian * (
-                        product + product.transpose() - 2 * np.eye(self.theta_dim)
-                    )
-                else:
-                    self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
-
-            # Article version after revision
-            elif self.algo == "article v2":
-                if self.sym:
-                    self.hessian_inv += -learning_rate_hessian * (
-                        product + product.transpose() - 2 * np.eye(self.theta_dim)
-                    )
-                else:
-                    self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
-                norm = np.linalg.norm(self.hessian_inv, ord="fro")
-                # beta'_n := gamma_n / (beta_n)^2 = 1 / (4 * learning_rate_hessian)
-                beta_prime = 1 / (4 * learning_rate_hessian)
-                if norm > beta_prime:
-                    self.hessian_inv *= beta_prime / norm
-
-            # Version with added term to ensure positive definiteness like in rapport, but right multiplication
-            elif self.algo == "right":
-                if self.sym:
-                    self.hessian_inv += -learning_rate_hessian * (
-                        product + product.transpose() - 2 * np.eye(self.theta_dim)
-                    ) + learning_rate_hessian**2 * np.einsum(
-                        "i,ij,j", Z, self.hessian_inv, Z
-                    ) * np.outer(
-                        Q, Q
-                    )
-                else:
-                    self.hessian_inv += -learning_rate_hessian * (
-                        product - np.eye(self.theta_dim)
-                    ) + learning_rate_hessian**2 * np.einsum(
-                        "i,ij,j", Z, self.hessian_inv, Z
-                    ) * np.outer(
-                        Q, Q
-                    )
-            else:
-                raise ValueError(
-                    "Invalid value for algo. Choose 'article', 'article v2' or 'right'."
-                )
-
-        return grad
-
-    # Different function because if we know Z is a canonic vector,
-    # some computations can a be simple column/coeff selection
-    def update_hessian_canonic_right(
-        self,
-        g: BaseObjectiveFunction,
-        data: np.ndarray | Tuple[np.ndarray, np.ndarray],
-        theta: np.ndarray,
     ) -> np.ndarray:
         """
         Update the hessian estimate with a canonic random vector, also returns grad
-        Old version, the multiplication by Z Z^T is done on the RIGHT of the random hessian h_t
         """
         # Generate Z
-        if self.generate_Z == "canonic":
-            z = np.random.randint(0, self.theta_dim)
-        elif self.generate_Z == "canonic deterministic":
-            z = self.k
-            # Update the index for the next iteration
-            self.k = (self.k + 1) % self.theta_dim
-        else:
-            raise ValueError("Invalid value for Z. Choose 'canonic' or 'canonic deterministic'.")
+        z = np.random.randint(0, self.param_dim)
 
-        # Compute vectors P and Q
-        grad, Q = g.grad_and_hessian_column(data, theta, z)
-        # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later after checking <=beta
-        P = self.hessian_inv[:, z]
-        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
-        beta = 1 / (2 * learning_rate_hessian)
+        # TODO: we want a line here, not a column. Do a grad_and_hessian_line function
+        # (It is the same if random hessians are symmetric, which is the case in our simulations.)
+        grad, Q = self.objective_function.grad_and_hessian_column(data, self.param, z)
+        # Z is supposed to be sqrt(param_dim) * e_z, but will multiply later
+        lr_hessian = self.lr_hess_const * (self.n_iter + self.lr_hess_add_iter) ** (
+            -self.lr_hess_exp
+        )
+        beta = 1 / (2 * lr_hessian)
 
-        # An alternative to bruno's added term would be the following condition (not studied yet):
-        # update_condition =  np.dot(Q, Q) * self.theta_dim**2 * P[z] <= beta**2:
-        update_condition = np.dot(Q, Q) * self.theta_dim**2 <= beta**2
-        if update_condition:
-            product = self.theta_dim * np.outer(Q, P)
+        if np.linalg.norm(Q) * self.param_dim <= beta:
+            product = self.param_dim * Q.T @ self.matrix
 
-            # Article version before revision
-            if self.algo == "article":
-                if self.sym:
-                    self.hessian_inv += -learning_rate_hessian * (
-                        product + product.transpose() - 2 * np.eye(self.theta_dim)
-                    )
-                else:
-                    self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
-
-            # Article version after revision
-            elif self.algo == "article v2":
-                if self.sym:
-                    self.hessian_inv += -learning_rate_hessian * (
-                        product + product.transpose() - 2 * np.eye(self.theta_dim)
-                    )
-                else:
-                    self.hessian_inv += -learning_rate_hessian * (product - np.eye(self.theta_dim))
-
-                # Projection step:
-                norm = np.linalg.norm(self.hessian_inv, ord="fro")
-                # beta'_n := gamma_n / (beta_n)^2 = 1 / (4 * learning_rate_hessian)
-                if norm > 1 / (4 * learning_rate_hessian):
-                    self.hessian_inv /= norm
-
-            # version with added term to ensure positive definiteness
-            elif self.algo == "right":
-                if self.sym:
-                    self.hessian_inv += -learning_rate_hessian * (
-                        product + product.transpose() - 2 * np.eye(self.theta_dim)
-                    ) + learning_rate_hessian**2 * P[z] * np.outer(Q, Q)
-                else:
-                    self.hessian_inv += -learning_rate_hessian * (
-                        product - np.eye(self.theta_dim)
-                    ) + learning_rate_hessian**2 * P[z] * np.outer(Q, Q)
+            self.matrix[z, :] += -lr_hessian * product
+            self.matrix[:, z] += -lr_hessian * product
+            self.matrix += 2 * lr_hessian * np.eye(self.param_dim)
+            self.matrix[z, z] += lr_hessian**2 * np.einsum("i,ij,j", Q, self.matrix, Q)
 
         return grad
 
-    def update_hessian_canonic_left(
-        self,
-        g: BaseObjectiveFunction,
-        data: np.ndarray | Tuple[np.ndarray, np.ndarray],
-        theta: np.ndarray,
-    ) -> np.ndarray:
+    def update_averaged_matrix(self) -> None:
         """
-        Update the hessian estimate with a canonic random vector, also returns grad
-        New version, the multiplication by Z Z^T is done on the LEFT of the random hessian h_t
-        Also new projected version, close to multiply on left so i put it here, not studied yet
+        Update the averaged condition matrix using the current matrix and the sum of weights.
         """
-        # Generate Z
-        if self.generate_Z == "canonic":
-            z = np.random.randint(0, self.theta_dim)
-        elif self.generate_Z == "canonic deterministic":
-            z = self.k
-            self.k = (self.k + 1) % self.theta_dim
+
+        if not self.averaged_matrix:
+            return
+
+        if self.weight_exp_matrix > 0:
+            weight = np.log(self.n_iter + 1) ** self.weight_exp_matrix
         else:
-            raise ValueError("Invalid value for Z. Choose 'canonic' or 'canonic deterministic'.")
-
-        # TODO: we want a line here, not a column. Do a grad_and_hessian_iine function
-        # It is the same if random hessians are symmetric, which is the case in our simulations.
-        grad, Q = g.grad_and_hessian_column(data, theta, z)
-        # Z is supposed to be sqrt(theta_dim) * e_z, but will multiply later
-        learning_rate_hessian = self.c_gamma * (self.iter + self.add_iter_hessian) ** (-self.gamma)
-        beta = 1 / (2 * learning_rate_hessian)
-
-        if np.dot(Q, Q) * self.theta_dim**2 <= beta**2:
-            product = self.theta_dim * Q.T @ self.hessian_inv
-
-            # rapport version, with the added term and the left multiplication by ZZ^T
-            if self.algo == "rapport":
-                self.hessian_inv[z, :] += -learning_rate_hessian * product
-                if self.sym:
-                    self.hessian_inv[:, z] += -learning_rate_hessian * product
-                self.hessian_inv += (1 + self.sym) * learning_rate_hessian * np.eye(self.theta_dim)
-                self.hessian_inv[z, z] += learning_rate_hessian**2 * np.einsum(
-                    "i,ij,j", Q, self.hessian_inv, Q
-                )
-
-            # Z Z^T replace Id, on top of rapport version
-            elif self.algo == "proj":
-                product[z] += -self.theta_dim
-                self.hessian_inv[z, :] += -learning_rate_hessian * product
-                if self.sym:
-                    self.hessian_inv[:, z] += -learning_rate_hessian * product
-                self.hessian_inv[z, z] += learning_rate_hessian**2 * np.einsum(
-                    "i,ij,j", Q, self.hessian_inv, Q
-                )
-
-        return grad
+            weight = 1
+        self.sum_weights += weight
+        self.matrix += (weight / self.sum_weights) * (self.matrix_not_avg - self.matrix)

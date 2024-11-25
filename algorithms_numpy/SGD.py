@@ -1,40 +1,65 @@
 import numpy as np
-from typing import Tuple
+import math
+from typing import Tuple, Dict, Any
 
-from algorithms_torch import BaseOptimizer
+from algorithms_numpy import BaseOptimizer
 from objective_functions_numpy_online import BaseObjectiveFunction
 
 
 class SGD(BaseOptimizer):
     """
     Stochastic Gradient Descent optimizer
-    Uses a learning rate lr = c_alpha * iteration^(-alpha)
+    Uses a learning rate lr = lr_const * (n_iter + lr_add_iter)^(-lr_exp) for optimization.
+    Averaged parameter can be calculated with a logarithmic weight, i.e. the weight is
+    calculated as log(n_iter+1)^weight_exp.
+
+    Parameters:
+    param (np.ndarray): Initial parameters for the optimizer.
+    lr_exp (float): Exponent for learning rate decay.
+    lr_const (float): Constant multiplier for learning rate.
+    lr_add_iter (int): Additional iterations for learning rate calculation.
+    averaged (bool): Whether to use an averaged parameter.
+    weight_exp (float): Exponent for the logarithmic weight.
     """
 
-    def __init__(self, nu: float, c_nu: float = 1.0, add_iter_theta: int = 20):
-        self.name = "SGD" + f" α={nu}"
-        self.alpha = nu
-        self.c_alpha = c_nu
-        self.add_iter_theta = (
-            add_iter_theta  # Dont start at 0 to avoid large learning rates at the beginning
+    def __init__(
+        self,
+        param: np.ndarray,
+        objective_function: BaseObjectiveFunction,
+        lr_exp: float = 1.0,
+        lr_const: float = 1.0,
+        lr_add_iter: int = 20,
+        averaged: bool = False,
+        weight_exp: float = 2.0,
+    ):
+        # Name for plotting
+        self.name = (
+            ("W" if averaged and weight_exp != 0.0 else "")
+            + ("A" if averaged else "")
+            + "SGD"
+            + (f" α={lr_exp}")
         )
+        self.lr_exp = lr_exp
+        self.lr_const = lr_const
+        self.lr_add_iter = lr_add_iter
 
-    def reset(self, initial_theta: np.ndarray):
-        """
-        Reset the optimizer state
-        """
-        self.iter = 0
+        super().__init__(param, objective_function, weight_exp)
 
     def step(
         self,
         data: np.ndarray | Tuple[np.ndarray, np.ndarray],
-        theta_estimate: np.ndarray,
-        g: BaseObjectiveFunction,
     ):
         """
         Perform one optimization step
+
+        Parameters:
+        data (np.ndarray | Tuple[np.ndarray, np.ndarray]): The input data for the optimization step.
         """
-        self.iter += 1
-        grad = g.grad(data, theta_estimate)
-        learning_rate = self.c_alpha * ((self.iter + self.add_iter_theta) ** (-self.alpha))
-        theta_estimate += -learning_rate * grad
+        self.n_iter += 1
+        grad = self.objective_function.grad(data, self.param_not_averaged)
+
+        # Update the non averaged parameter
+        learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
+        self.param_not_averaged -= learning_rate * grad
+
+        self.update_averaged_param()
