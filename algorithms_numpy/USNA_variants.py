@@ -10,6 +10,8 @@ class USNA_variants(USNA):
     Universal Stochastic Newton Algorithm optimizer
     """
 
+    class_name = "USNA_variants"
+
     def __init__(
         self,
         param: np.ndarray,
@@ -27,6 +29,8 @@ class USNA_variants(USNA):
         compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
         generate_Z: str = "canonic",
         sym: bool = True,  # Symmetric estimate of the hessian
+        multiply_right: bool = False,  # If the random hessian h is multiplied on the right by Z Z^T
+        proj: bool = False,  # If the identity is replaced by Z Z^T, to reduce variance
         algo: str = "rapport",  # Version of USNA described in the rapport, by default
     ):
         super().__init__(
@@ -47,35 +51,32 @@ class USNA_variants(USNA):
 
         self.generate_Z = generate_Z
         self.sym = sym
+        self.multiply_right = multiply_right
+        self.proj = proj
         self.algo = algo
 
         self.name += (
             f" {algo}"
             + (f" Z={generate_Z}" if generate_Z != "canonic" else "")
-            + ("NS" if not sym else "")
+            + (" NS" if not sym else "")
+            + (" P" if proj else "")
         )
 
         # Test different versions of the algorithm
-        # 'article', 'article v2' for the revised version with frobenius ball projection
-        # 'rapport' for the added term with left multiplication by ZZ^T, 'right' for right multiplication
-        # 'proj' for left multiplication and ZZ^T au lieu de Id, not studied in theory yet
-        versions = ["article", "article v2", "rapport", "right", "proj"]
+        versions = [
+            "article",
+            "article_v2",
+            "rapport",
+            # "new", # TODO
+        ]
         if algo not in versions:
             raise ValueError("Invalid value for algo. Choose " + ", ".join(versions) + ".")
 
         # In case we know Z is a random vector of canonic base, we can compute faster P and Q
         if generate_Z == "normal":
             self.update_hessian = self.update_hessian_normal
-            if self.algo == "rapport" or self.algo == "proj":
-                raise ValueError(
-                    "Invalid value for algo. No point in multiplying on the left with a normal vector."
-                )
-        elif generate_Z == "canonic" or generate_Z == "canonic deterministic":
-            # Different fonction if we multiply by Z Z^T on the left or on the right
-            if self.algo == "rapport" or self.algo == "proj":
-                self.update_hessian = self.update_hessian_canonic_left
-            else:
-                self.update_hessian = self.update_hessian_canonic_right
+        elif generate_Z in ["canonic", "canonic deterministic"]:
+            self.update_hessian = self.update_hessian_canonic
         else:
             raise ValueError(
                 "Invalid value for Z. Choose 'normal', 'canonic' or 'canonic deterministic'."
@@ -90,67 +91,94 @@ class USNA_variants(USNA):
         """
         grad, hessian = self.objective_function.grad_and_hessian(data, self.param)
         Z = np.random.standard_normal(self.param_dim)
-        P = self.matrix @ Z
-        Q = hessian @ Z
+        Z /= np.linalg.norm(Z)  # Normalize Z
+        h_Z = hessian @ Z
         learning_rate_hessian = self.lr_hess_const * (self.n_iter + self.lr_hess_add_iter) ** (
             -self.lr_hess_exp
         )
         beta = 1 / (2 * learning_rate_hessian)
 
-        if np.dot(Q, Q) * np.dot(Z, Z) <= beta**2:
-            product = np.outer(Q, P)
+        if np.linalg.norm(h_Z) <= beta:
+            I_d = np.eye(self.param_dim) if not self.proj else np.linalg.outer(Z, Z)
+
+            if self.multiply_right:
+                # product := h Z Z^T A
+                A_Z = self.matrix @ Z
+                Zt_A = np.matmul(Z, self.matrix)
+                product = np.linalg.outer(h_Z, Zt_A)
+            else:
+                # product := Z Z^T h A
+                A_h_Z = np.matmul(self.matrix, h_Z)
+                product = np.linalg.outer(Z, A_h_Z)  # Assuming h and A are symmetric
 
             # Article version before revision
+            # A_new := A_old - lr_hessian * (h Z Z^T A_old + A_old Z Z^T h - 2 Id)
             if self.algo == "article":
                 if self.sym:
                     self.matrix += -learning_rate_hessian * (
-                        product + product.transpose() - 2 * np.eye(self.param_dim)
+                        product + product.transpose() - 2 * I_d
                     )
                 else:
-                    self.matrix += -learning_rate_hessian * (product - np.eye(self.param_dim))
+                    # We multiply by 2 to match the symmetric case
+                    self.matrix += -2 * learning_rate_hessian * (product - I_d)
 
-            # Article version after revision
-            elif self.algo == "article v2":
+            # Article version after revision, with projection step
+            elif self.algo == "article_v2":
+                A_Z = self.matrix @ Z
+                h_Z_Zt_A = np.linalg.outer(h_Z, A_Z)
                 if self.sym:
                     self.matrix += -learning_rate_hessian * (
-                        product + product.transpose() - 2 * np.eye(self.param_dim)
+                        h_Z_Zt_A + h_Z_Zt_A.transpose() - 2 * I_d
                     )
                 else:
-                    self.matrix += -learning_rate_hessian * (product - np.eye(self.param_dim))
+                    self.matrix += -2 * learning_rate_hessian * (h_Z_Zt_A - I_d)
+
+                # Projection step
                 norm = np.linalg.norm(self.matrix, ord="fro")
-                # beta'_n := gamma_n / (beta_n)^2 = 1 / (4 * learning_rate_hessian)
+                # we take beta'_n := gamma_n / (beta_n)^2 = 1 / (4 * learning_rate_hessian)
                 beta_prime = 1 / (4 * learning_rate_hessian)
                 if norm > beta_prime:
                     self.matrix *= beta_prime / norm
 
-            # Version with added term to ensure positive definiteness like in rapport, but right multiplication
-            elif self.algo == "right":
+            # Version with added term to ensure positive definiteness and left multiplication for h, like in rapport
+            # A_new := A_old - lr_hessian * (Z Z.T h A_old + A_old h Z Z.T - 2 Id) + lr_hessian^2 * Z Z.T h A_old h Z Z.T
+            elif self.algo == "rapport":
+                A_h_Z = np.matmul(self.matrix, h_Z)
+                Z_Zt_h_A = np.linalg.outer(Z, A_h_Z)  # Assuming h and A are symmetric
+                Z_Zt = I_d if self.proj else np.linalg.outer(Z, Z)
                 if self.sym:
-                    self.matrix += -learning_rate_hessian * (
-                        product + product.transpose() - 2 * np.eye(self.param_dim)
-                    ) + learning_rate_hessian**2 * np.einsum(
-                        "i,ij,j", Z, self.matrix, Z
-                    ) * np.outer(
-                        Q, Q
+                    self.matrix += (
+                        -learning_rate_hessian * (Z_Zt_h_A + Z_Zt_h_A.transpose() - 2 * I_d)
+                        + learning_rate_hessian**2 * np.dot(h_Z, A_h_Z) * Z_Zt
                     )
                 else:
-                    self.matrix += -learning_rate_hessian * (
-                        product - np.eye(self.param_dim)
-                    ) + learning_rate_hessian**2 * np.einsum(
-                        "i,ij,j", Z, self.matrix, Z
-                    ) * np.outer(
-                        Q, Q
+                    self.matrix += (
+                        -2 * learning_rate_hessian * (Z_Zt_h_A - I_d)
+                        + learning_rate_hessian**2 * np.dot(h_Z, A_h_Z) * Z_Zt
                     )
-            else:
-                raise ValueError(
-                    "Invalid value for algo. Choose 'article', 'article v2' or 'right'."
-                )
+
+            # Version like in rapport, but right multiplication for h by Z Z^T
+            # A_new := A_old - lr_hessian * (h Z Z.T A_old + A_old Z Z.T h - 2 Id) + lr_hessian^2 * h Z Z.T A_old Z Z.T h
+            elif self.algo == "rapport_right":
+                A_Z = self.matrix @ Z
+                h_Z_Zt_A = np.linalg.outer(h_Z, A_Z)
+                Z_Zt = I_d if self.proj else np.linalg.outer(Z, Z)
+                if self.sym:
+                    self.matrix += (
+                        -learning_rate_hessian
+                        * (h_Z_Zt_A + h_Z_Zt_A.transpose() - 2 * np.eye(self.param_dim))
+                        + learning_rate_hessian**2 * np.dot(Z, A_Z) * Z_Zt
+                    )
+                else:
+                    self.matrix += (
+                        -learning_rate_hessian * 2 * (h_Z_Zt_A - np.eye(self.param_dim))
+                        + learning_rate_hessian**2 * np.dot(Z, A_Z) * Z_Zt
+                    )
 
         return grad
 
-    # Different function because if we know Z is a canonic vector,
-    # some computations can a be simple column/coeff selection
-    def update_hessian_canonic_right(
+    # Different function because if Z is a canonic vector, some computations can a be simple column/coeff selection
+    def update_hessian_canonic(
         self,
         data: np.ndarray | Tuple[np.ndarray, np.ndarray],
     ) -> np.ndarray:
@@ -181,7 +209,7 @@ class USNA_variants(USNA):
         # update_condition =  np.dot(Q, Q) * self.param_dim**2 * P[z] <= beta**2:
         update_condition = np.dot(Q, Q) * self.param_dim**2 <= beta**2
         if update_condition:
-            product = self.param_dim * np.outer(Q, P)
+            product = self.param_dim * np.linalg.outer(Q, P)
 
             # Article version before revision
             if self.algo == "article":
@@ -212,11 +240,11 @@ class USNA_variants(USNA):
                 if self.sym:
                     self.matrix += -learning_rate_hessian * (
                         product + product.transpose() - 2 * np.eye(self.param_dim)
-                    ) + learning_rate_hessian**2 * P[z] * np.outer(Q, Q)
+                    ) + learning_rate_hessian**2 * P[z] * np.linalg.outer(Q, Q)
                 else:
                     self.matrix += -learning_rate_hessian * (
                         product - np.eye(self.param_dim)
-                    ) + learning_rate_hessian**2 * P[z] * np.outer(Q, Q)
+                    ) + learning_rate_hessian**2 * P[z] * np.linalg.outer(Q, Q)
 
         return grad
 

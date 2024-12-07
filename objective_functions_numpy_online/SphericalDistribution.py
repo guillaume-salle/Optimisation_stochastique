@@ -25,7 +25,7 @@ class SphericalDistribution(BaseObjectiveFunction):
         else:
             return 0.5 * (np.linalg.norm(X - a, axis=1) - b) ** 2
 
-    def get_theta_dim(self, data: np.ndarray) -> int:
+    def get_param_dim(self, data: np.ndarray) -> int:
         """
         Return the dimension of theta
         """

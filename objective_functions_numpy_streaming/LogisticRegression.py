@@ -75,7 +75,7 @@ class LogisticRegression(BaseObjectiveFunction):
 
         return correct_predictions / total
 
-    def get_theta_dim(self, data: Tuple[np.ndarray, np.ndarray]) -> int:
+    def get_param_dim(self, data: Tuple[np.ndarray, np.ndarray]) -> int:
         """
         Return the dimension of theta
         """

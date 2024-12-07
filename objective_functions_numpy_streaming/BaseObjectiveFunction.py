@@ -15,13 +15,11 @@ class BaseObjectiveFunction(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_theta_dim(self, data: np.ndarray | Tuple[np.ndarray, np.ndarray]) -> int:
+    def get_param_dim(self, data: np.ndarray | Tuple[np.ndarray, np.ndarray]) -> int:
         raise NotImplementedError
 
     @abstractmethod
-    def grad(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
-    ) -> np.ndarray:
+    def grad(self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
@@ -51,13 +49,9 @@ class BaseObjectiveFunction(ABC):
     def riccati(
         self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:
-        raise NotImplementedError(
-            "Riccati is not implemented for this objective function"
-        )
+        raise NotImplementedError("Riccati is not implemented for this objective function")
 
     def grad_and_riccati(
         self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
-        raise NotImplementedError(
-            "Riccati is not implemented for this objective function"
-        )
+        raise NotImplementedError("Riccati is not implemented for this objective function")

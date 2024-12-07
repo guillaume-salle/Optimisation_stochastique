@@ -27,11 +27,11 @@ n = int(1e4)
 batch_size_power = 0
 batch_size_power_list = [0]
 
-# Configuration for true theta
+# Configuration for true parameter
 # Value from the article:
-true_theta = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
-# true_theta = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0])  # Slides, bias=False
-# true_theta = torch.tensor([1, 1, 1, 1, 1])  # Poly, bias=False
+true_param = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
+# true_param = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0])  # Slides, bias=False
+# true_param = torch.tensor([1, 1, 1, 1, 1])  # Poly, bias=False
 
 # Whether or not a bias term is included
 bias_setting = True
@@ -43,10 +43,10 @@ e_values = [1, 2]
 # Linear regression
 simulation_linear_regression = partial(
     Simulation,
-    g=LinearRegression(bias=bias_setting),
+    objective_function=LinearRegression(bias=bias_setting),
     batch_size_power=batch_size_power,
     batch_size_power_list=batch_size_power_list,
-    true_theta=true_theta,
+    true_param=true_param,
     generate_dataset=partial(generate_linear_regression, bias=bias_setting),
     e_values=e_values,
 )
@@ -54,22 +54,22 @@ simulation_linear_regression = partial(
 # Logistic regression
 simulation_logistic_regression = partial(
     Simulation,
-    g=LogisticRegression(bias=bias_setting),
+    objective_function=LogisticRegression(bias=bias_setting),
     batch_size_power=batch_size_power,
     batch_size_power_list=batch_size_power_list,
-    true_theta=true_theta,
+    true_param=true_param,
     generate_dataset=partial(generate_logistic_regression, bias=bias_setting),
     e_values=e_values,
 )
 
 # Geometric median
-true_theta_geometric_median = np.zeros(10)
+true_param_geometric_median = np.zeros(10)
 simulation_geometric_median = partial(
     Simulation,
-    g=GeometricMedian(),
+    objective_function=GeometricMedian(),
     batch_size_power=batch_size_power,
     batch_size_power_list=batch_size_power_list,
-    true_theta=true_theta_geometric_median,
+    true_param=true_param_geometric_median,
     generate_dataset=generate_geometric_median,
     e_values=e_values,
 )
@@ -78,13 +78,13 @@ simulation_geometric_median = partial(
 mu = np.zeros(3)
 r = 2.0
 delta = 0.2
-true_theta_spherical_distribution = np.append(mu, r)
+true_param_spherical_distribution = np.append(mu, r)
 simulation_spherical_distribution = partial(
     Simulation,
-    g=SphericalDistribution(),
+    objective_function=SphericalDistribution(),
     batch_size_power=batch_size_power,
     batch_size_power_list=batch_size_power_list,
-    true_theta=true_theta_spherical_distribution,
+    true_param=true_param_spherical_distribution,
     generate_dataset=partial(generate_spherical_distribution, delta=delta),
     e_values=[0.5, 1],
 )
@@ -93,13 +93,13 @@ simulation_spherical_distribution = partial(
 # p-means
 d = 40
 p = 1.5
-true_theta_p_means = np.zeros(d)
+true_param_p_means = np.zeros(d)
 simulation_p_means = partial(
     Simulation,
-    g=pMeans(p=p),
+    objective_function=pMeans(p=p),
     batch_size_power=batch_size_power,
     batch_size_power_list=batch_size_power_list,
-    true_theta=true_theta_p_means,
+    true_param=true_param_p_means,
     generate_dataset=generate_p_means,
     e_values=e_values,
 )
@@ -108,14 +108,14 @@ simulation_p_means = partial(
 train_covtype, test_covtype, name = covtype()
 eval_covtype = partial(
     Simulation,
-    g=LogisticRegression(bias=True),
+    objective_function=LogisticRegression(bias=True),
     batch_size_power=batch_size_power,
     batch_size_power_list=batch_size_power_list,
-    true_theta=None,
+    true_param=None,
     generate_dataset=None,
     dataset=train_covtype,
     test_dataset=test_covtype,
     dataset_name=name,
-    initial_theta=np.zeros(54 + 1),
+    initial_param=np.zeros(54 + 1),
     e_values=None,
 )

@@ -22,9 +22,12 @@ class SNA(BaseOptimizer):
     weight_exp (float): Exponent for the logarithmic weight.
     """
 
+    class_name = "SNA"
+
     def __init__(
         self,
         param: np.ndarray,
+        objective_function: BaseObjectiveFunction,
         lr_exp: float = 1.0,
         lr_const: float = 1.0,
         lr_add_iter: int = 20,
@@ -33,13 +36,15 @@ class SNA(BaseOptimizer):
         weight_exp: float = 2.0,  # Exponent for the logarithmic weight
         compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
         compute_inverse: bool = False,  # Actually compute inverse, or just solve the system
-        sherman_morrison: bool = False,  # Whether to use the Sherman-Morrison formula
+        sherman_morrison: bool = True,  # Whether to use the Sherman-Morrison formula
     ):
         self.name = (
-            ("WASNA" if weight_exp != 0.0 else "SNA*")
+            ("W" if averaged and weight_exp != 0.0 else "")
+            + ("A" if averaged else "")
+            + "SNA"
             + (f" α={lr_exp}")
             + (f" τ_theta={weight_exp}" if weight_exp != 2.0 and weight_exp != 0.0 else "")
-            + (" NAP" if not compute_hessian_param_avg else "")  # NAP = Not Averaged Parameter
+            + (" AP" if compute_hessian_param_avg else "")  # AP = Averaged Parameter
         )
         self.lr_exp = lr_exp
         self.lr_const = lr_const
@@ -49,15 +54,16 @@ class SNA(BaseOptimizer):
         self.compute_inverse = compute_inverse
         self.sherman_morrison = sherman_morrison
 
-        if sherman_morrison:
+        if sherman_morrison and hasattr(objective_function, "sherman_morrison"):
             self.step = self.step_sherman_morrison
             self.hessian_inv = np.eye(param.shape[0])
+            self.name += " SM"
         else:
             self.hessian_bar = np.eye(param.shape[0])
             if compute_inverse:
                 self.hessian_inv = np.eye(param.shape[0])
 
-        super().__init__(param, averaged, weight_exp)
+        super().__init__(param, objective_function, averaged, weight_exp)
 
     def step(
         self,
@@ -104,9 +110,11 @@ class SNA(BaseOptimizer):
         self.n_iter += 1
         if self.compute_hessian_param_avg:  # cf article
             grad = self.objective_function.grad(data, self.param_not_averaged)
-            phi = self.objective_function.riccati(data, self.param)
+            phi = self.objective_function.sherman_morrison(data, self.param)
         else:  # faster, allow to re-ure the grad from hessian computation
-            grad, phi = self.objective_function.grad_and_riccati(data, self.param_not_averaged)
+            grad, phi = self.objective_function.grad_and_sherman_morrison(
+                data, self.param_not_averaged
+            )
 
         # Update the inverse Hessian matrix using the Sherman-Morrison equation
         n_matrix = self.n_iter + self.identity_weight

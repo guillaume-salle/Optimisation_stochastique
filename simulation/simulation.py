@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import time
 from typing import List, Tuple, Callable
+from functools import partial
 
 import matplotlib.patches as mpatches
 
@@ -25,23 +26,23 @@ from objective_functions_numpy_streaming import BaseObjectiveFunction
 class Simulation:
     """
     Simulation class to run optimization experiments with second order methods,
-    on a given function g, with computable gradient and hessian.
+    on a given objective function, with computable gradient and hessian.
     """
 
     def __init__(
         self,
-        g: BaseObjectiveFunction,
-        optimizer_list: List[BaseOptimizer],
+        objective_function: BaseObjectiveFunction,  # Not instantiated yet
+        optimizer_list: List[partial[BaseOptimizer]],
         batch_size_power: float | int = None,  # power of d
         batch_size_power_list: list[float | int] = None,  # for comparing different batch sizes
-        generate_dataset: Callable = None,  # generate with true_theta
+        generate_dataset: Callable = None,  # generate a dataset with a true_param
         dataset: MyDataset = None,
         test_dataset: MyDataset = None,  # for accuracy evaluation
         dataset_name: str = None,
-        true_theta: np.ndarray | torch.Tensor = None,
-        true_hessian_inv: np.ndarray | torch.Tensor = None,
-        initial_theta: np.ndarray | torch.Tensor = None,
-        e_values: List[float] = [1.0, 2.0],
+        true_param: np.ndarray | torch.Tensor = None,
+        true_matrix: np.ndarray | torch.Tensor = None,
+        initial_param: np.ndarray | torch.Tensor = None,
+        e_values: List[float] = [1.0, 2.0],  # noise level for initial parameter
         use_torch: bool = False,
         device: str = None,
     ):
@@ -50,25 +51,25 @@ class Simulation:
         """
         if generate_dataset is None and dataset is None:
             raise ValueError("create_dataset or dataset should be set")
-        if generate_dataset is not None and true_theta is None:
-            raise ValueError("true_theta should be set if create_dataset is set")
+        if generate_dataset is not None and true_param is None:
+            raise ValueError("true_param should be set if create_dataset is set")
 
-        self.true_theta = true_theta
-        self.true_hessian_inv = true_hessian_inv
-        self.g = g
+        self.true_param = true_param
+        self.true_matrix = true_matrix
+        self.objective_function = objective_function
         self.optimizer_list = optimizer_list
-        self.check_duplicate_names()
         self.batch_size_power = batch_size_power
         self.batch_size_power_list = batch_size_power_list
         self.generate_dataset = generate_dataset
         self.dataset = dataset
         self.test_dataset = test_dataset
         self.dataset_name = dataset_name
-        self.true_theta = true_theta
-        self.true_hessian_inv = true_hessian_inv
-        self.use_torch = isinstance(true_theta, torch.Tensor) or use_torch
-        self.initial_theta = initial_theta
-        self.e_values = e_values
+        self.true_param = true_param
+        self.true_matrix = true_matrix
+        self.use_torch = isinstance(true_param, torch.Tensor) or use_torch
+        self.initial_param = initial_param
+        self.init_variances = e_values
+        self.check_duplicate_names()
 
         # Set the device for torch tensors
         self.use_torch = use_torch
@@ -76,95 +77,100 @@ class Simulation:
             self.device = torch.device(device)
             if device is None:
                 self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.g.to(self.device)
-            if self.true_theta is not None:
-                self.true_theta = torch.as_tensor(self.true_theta, device=self.device)
-            if self.true_hessian_inv is not None:
-                self.true_hessian_inv = torch.as_tensor(self.true_hessian_inv, device=self.device)
-            if self.initial_theta is not None:
-                self.initial_theta = torch.as_tensor(self.initial_theta, device=self.device)
+            self.objective_function.to(self.device)
+            if self.true_param is not None:
+                self.true_param = torch.as_tensor(self.true_param, device=self.device)
+            if self.true_matrix is not None:
+                self.true_matrix = torch.as_tensor(self.true_matrix, device=self.device)
+            if self.initial_param is not None:
+                self.initial_param = torch.as_tensor(self.initial_param, device=self.device)
 
     def check_duplicate_names(self):
         """
         Check if there are duplicate names in the optimizer list,
         name are used as keys in the results dictionary and should be unique.
+        Also, set the names_list for the optimizers.
         """
-        name_set = set()
-        for optimizer in self.optimizer_list:
-            if optimizer.name in name_set:
+        name_list = []
+        for optimizer_class in self.optimizer_list:
+            optimizer = optimizer_class(
+                objective_function=self.objective_function, param=np.zeros(1)
+            )
+            if optimizer.name in name_list:
                 raise ValueError(f"Duplicate optimizer name found: '{optimizer.name}'")
-            name_set.add(optimizer.name)
+            name_list.append(optimizer.name)
+        self.names_list = name_list
 
-    def generate_initial_theta(self, e: float = 1.0):
+    def generate_initial_param(self, variance: float = 1.0):
         """
-        Generate a random initial theta around the true theta with a given noise level e.
+        Generate a random initial parameter around the true parameter with a given noise level.
         """
-        # Get the dimension of theta from the dataset
+        # Get the dimension of the parameter from the dataset
         if self.dataset is None:
             raise ValueError("dataset is not set")
-        theta_dim = self.g.get_theta_dim(data=next(iter(self.dataset)))
+        param_dim = self.objective_function.get_param_dim(data=next(iter(self.dataset)))
 
-        # Check if the true theta has the same dimension
-        if self.true_theta is not None and self.true_theta.shape[0] != theta_dim:
+        # Check if the true parameter has the same dimension
+        if self.true_param is not None and self.true_param.shape[0] != param_dim:
             raise ValueError(
-                f"true_theta dim ({self.true_theta.size(0)}) does not match the dim of theta ({theta_dim}) for g"
+                f"true_param dim ({self.true_param.size(0)}) does not match param_dim ({param_dim}) from the dataset"
             )
 
-        # Generate the initial theta
-        loc = self.true_theta if self.true_theta is not None else np.zeros(theta_dim)
-        self.initial_theta = loc + e * np.random.randn(theta_dim)
+        # Generate the initial parameter
+        loc = self.true_param if self.true_param is not None else np.zeros(param_dim)
+        self.initial_param = loc + variance * np.random.randn(param_dim)
 
         # Convert to torch tensor if needed
         if self.use_torch:
-            self.initial_theta = torch.as_tensor(self.initial_theta, device=self.device)
+            self.initial_param = torch.as_tensor(self.initial_param, device=self.device)
 
     def logging_estimation_error(
         self,
-        theta_errors: dict[str, list],
-        hessian_inv_errors: dict[str, list],
-        optimizer,
+        param_errors: dict[str, list],
+        matrix_errors: dict[str, list],
+        optimizer: BaseOptimizer,
     ):
         """
-        Log the estimation error of theta and hessian inverse with either numpy or torch tensors
+        Log the estimation error of the parameter and matrix with either numpy or torch tensors
         """
-        # Log the estimation error of theta
-        diff = self.theta - self.true_theta
-        theta_error = np.dot(diff, diff) if not self.use_torch else torch.dot(diff, diff).item()
-        theta_errors[optimizer.name].append(theta_error)
+        # Log the estimation error of the parameter
+        diff = self.param - self.true_param
+        param_error = np.dot(diff, diff) if not self.use_torch else torch.dot(diff, diff).item()
+        param_errors[optimizer.name].append(param_error)
 
-        # Log the estimation error of hessian inverse if true hessian inverse is provided
-        if self.true_hessian_inv is not None and hasattr(optimizer, "hessian_inv"):
-            diff = optimizer.hessian_inv - self.true_hessian_inv
+        # Log the estimation error of condition matrix estimation if a true matrix is provided
+        if self.true_matrix is not None and hasattr(optimizer, "matrix"):
+            diff = optimizer.matrix - self.true_matrix
             if not self.use_torch:
-                hessian_inv_error = np.linalg.norm(diff, ord="fro")
+                matrix_error = np.linalg.norm(diff, ord="fro")
             else:
-                hessian_inv_error = torch.norm(diff, p="fro").item()
-            hessian_inv_errors[optimizer.name].append(hessian_inv_error)
+                matrix_error = torch.norm(diff, p="fro").item()
+            matrix_errors[optimizer.name].append(matrix_error)
 
     def run_track_errors(
         self,
         pbars: Tuple[tqdm, tqdm] = None,
     ) -> Tuple[dict, dict]:
         """
-        Run the experiment with all optimizers for a given initial theta and a dataset generated with a true theta,
-        and track the estimation errors of theta and hessian inverse if true hessian inverse is provided.
+        Run the experiment with all optimizers for a given initial parameter and a dataset generated with a true parameter,
+        and track the estimation errors of parameter and matrix if a true matrix is provided.
         Args:
             pbars (Tuple[tqdm, tqdm]): Tuple of progress bars for optimizers and data
         Returns:
-            Tuple[dict, dict]: Dictionaries of estimation errors for theta and hessian inverse for all optimizers
+            Tuple[dict, dict]: Dictionaries of estimation errors for parameter and matrix for all optimizers
         """
         if self.batch_size_power is None:
             raise ValueError("batch_size_power is not set")
-        batch_size = int(len(self.initial_theta) ** self.batch_size_power)
+        batch_size = int(len(self.initial_param) ** self.batch_size_power)
 
         # Initialize the directories for errors, if true values are provided
-        if self.true_theta is None:
-            raise ValueError("true_theta is not set")
-        theta_errors = {optimizer.name: [] for optimizer in self.optimizer_list}
-        if self.true_hessian_inv is not None:
-            hessian_inv_errors = {optimizer.name: [] for optimizer in self.optimizer_list}
+        if self.true_param is None:
+            raise ValueError("true_param is not set")
+        param_errors = {name: [] for name in self.names_list}
+        if self.true_matrix is not None:
+            matrix_errors = {name: [] for name in self.names_list}
         else:
-            hessian_inv_errors = None
+            matrix_errors = None
 
         # tqdm with VScode bugs, have to initialize the bars outside and reset in the loop.
         if pbars is not None:
@@ -175,19 +181,18 @@ class Simulation:
             data_pbar = tqdm(total=len(self.dataset), desc="Data", position=1, leave=False)
 
         # Run the experiment for each optimizer
-        for optimizer in self.optimizer_list:
-            optimizer_pbar.set_description(optimizer.name)
+        for optimizer_class in self.optimizer_list:
             data_pbar.reset(total=len(self.dataset))
 
-            # Initialize the optimizer and theta
-            optimizer.reset(self.initial_theta)
+            # Initialize the optimizer and parameter
             if self.use_torch:
-                self.theta = self.initial_theta.clone().to(self.device)
+                self.param = self.initial_param.clone().to(self.device)
             else:
-                self.theta = self.initial_theta.copy()
-
-            # Log initial error
-            self.logging_estimation_error(theta_errors, hessian_inv_errors, optimizer)
+                self.param = self.initial_param.copy()
+            optimizer = optimizer_class(
+                objective_function=self.objective_function, param=self.param
+            )
+            optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
             if self.use_torch:
@@ -195,10 +200,13 @@ class Simulation:
             else:
                 data_loader = self.dataset.batch_iter(batch_size)
 
+            # Log initial error
+            self.logging_estimation_error(param_errors, matrix_errors, optimizer)
+
             # Run the optimizer on the dataset
             for data in data_loader:
-                optimizer.step(data, self.theta, self.g)
-                self.logging_estimation_error(theta_errors, hessian_inv_errors, optimizer)
+                optimizer.step(data)
+                self.logging_estimation_error(param_errors, matrix_errors, optimizer)
                 data_pbar.update(batch_size)
 
             optimizer_pbar.update(1)
@@ -208,34 +216,34 @@ class Simulation:
             optimizer_pbar.close()
             data_pbar.close()
 
-        return theta_errors, hessian_inv_errors
+        return param_errors, matrix_errors
 
     def run_track_time(
         self,
         pbars: Tuple[tqdm, tqdm] = None,
     ) -> Tuple[dict, dict]:
         """
-        Run the experiment for all optimizers and a given initial theta and dataset, and track
-        the execution time and last theta error if true theta is provided, or accuracy if test_dataset is provided.
+        Run the experiment for all optimizers and a given initial parameter and dataset, and track
+        the execution time and last parameter error if true parameter is provided, or accuracy if test_dataset is provided.
         Args:
             pbars (Tuple[tqdm, tqdm]): Tuple of progress bars for optimizers and data
         Returns:
-            Tuple[dict, dict]: Dictionaries of execution times and last theta error
+            Tuple[dict, dict]: Dictionaries of execution times and last paramter error
                 for all optimizers
         """
         if self.batch_size_power is None:
             raise ValueError("batch_size_power is not set")
-        batch_size = int(len(self.initial_theta) ** self.batch_size_power)
+        batch_size = int(len(self.initial_param) ** self.batch_size_power)
 
         # Determine the metric to evaluate,
-        if self.true_theta is not None:
-            metrics = "last theta error"
+        if self.true_param is not None:
+            metrics = "last parameter error"
         elif self.test_dataset is not None:
             metrics = "accuracies"
         else:
-            raise ValueError("true_theta and/or test_dataset are not set")
+            raise ValueError("true_param and/or test_dataset are not set")
 
-        # Store execution times, and last theta error and accuracies if possible to evaluate
+        # Store execution times, and last parameter error and accuracies if possible to evaluate
         execution_times = {}
         metrics_dict = {}
 
@@ -248,15 +256,18 @@ class Simulation:
             data_pbar = tqdm(total=len(self.dataset), desc="Data", position=1, leave=False)
 
         # Run the experiment for each optimizer
-        for optimizer in self.optimizer_list:
-            optimizer_pbar.set_description(optimizer.name)
+        for optimizer_class in self.optimizer_list:
             data_pbar.reset(total=len(self.dataset))
 
-            # Initialize the theta
+            # Initialize the parameter
             if self.use_torch:
-                self.theta = self.initial_theta.clone().to(self.device)
+                self.param = self.initial_param.clone().to(self.device)
             else:
-                self.theta = self.initial_theta.copy()
+                self.param = self.initial_param.copy()
+            optimizer = optimizer_class(
+                objective_function=self.objective_function, param=self.param
+            )
+            optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
             if self.use_torch:
@@ -266,22 +277,21 @@ class Simulation:
 
             # Start timing the optimizer
             time_start = time.time()
-            optimizer.reset(self.initial_theta)
 
             # Run the optimizer on the dataset
             for data in data_loader:
-                optimizer.step(data, self.theta, self.g)
+                optimizer.step(data)
                 data_pbar.update(batch_size)
 
             time_end = time.time()
             execution_times[optimizer.name] = time_end - time_start
-            if metrics == "last theta error":
+            if metrics == "last parameter error":
                 metrics_dict[optimizer.name] = np.dot(
-                    self.theta - self.true_theta, self.theta - self.true_theta
+                    self.param - self.true_param, self.param - self.true_param
                 )
             elif metrics == "accuracies":
-                train_acc = self.g.evaluate_accuracy(self.dataset, self.theta)
-                test_acc = self.g.evaluate_accuracy(self.test_dataset, self.theta)
+                train_acc = self.objective_function.evaluate_accuracy(self.dataset, self.param)
+                test_acc = self.objective_function.evaluate_accuracy(self.test_dataset, self.param)
                 metrics_dict[optimizer.name] = {
                     "Training Accuracy": train_acc,
                     "Test Accuracy": test_acc,
@@ -329,21 +339,21 @@ class Simulation:
 
     def run_multiple_track_errors(self, N: int = 100, n: int = 10_000, eval_time: bool = False):
         """
-        Run the experiment multiple times by generating a new dataset and initial theta each time.
-        Track the estimation errors of theta, and hessian inverse if true hessian inverse is provided.
+        Run the experiment multiple times by generating a new dataset and initial paramter each time.
+        Track the estimation errors of paramter, and matrix if a true matrix is provided.
         Plot the errors for each value of e in e_values in separate subplots.
         Args:
             N (int): Number of simulations
             n (int): Number of samples in the dataset
         Returns:
-            Tuple[dict, dict]: Dictionaries of execution times and last theta errors for all optimizers
+            Tuple[dict, dict]: Dictionaries of execution times and last param errors for all optimizers
         """
         if self.generate_dataset is None:
             raise ValueError("generate_dataset must be set")
 
-        # Initialize error dictionaries to hold results for all e values
-        all_theta_errors_avg = {}
-        all_hessian_inv_errors_avg = {}
+        # Initialize error dictionaries to hold results for all the initial variances
+        all_param_errors_avg = {}
+        all_matrix_errors_avg = {}
 
         # tqdm with VScode bugs, have to initialize the bars outside and reset in the loop
         N_runs_pbar = tqdm(range(N), position=0, leave=False)
@@ -352,48 +362,48 @@ class Simulation:
         )
         data_pbar = tqdm(total=n, desc="Data", position=2, leave=False)
 
-        for e in self.e_values:
-            # Initialize the error dictionaries for this e value
-            theta_errors_avg = {optimizer.name: 0.0 for optimizer in self.optimizer_list}
-            if self.true_hessian_inv is not None:
-                hessian_inv_errors_avg = {optimizer.name: 0.0 for optimizer in self.optimizer_list}
+        for variance in self.init_variances:
+            # Initialize the error dictionaries for this variance for initial parameter
+            param_errors_avg = {name: 0.0 for name in self.names_list}
+            if self.true_matrix is not None:
+                matrix_errors_avg = {optimizer.name: 0.0 for optimizer in self.optimizer_list}
             else:
-                hessian_inv_errors_avg = None
+                matrix_errors_avg = None
 
-            # Loop of N simulations, each with a new dataset and initial theta
+            # Loop of N simulations, each with a new dataset and initial paramter
             N_runs_pbar.reset(total=N)
-            N_runs_pbar.set_description(f"Runs for e={e}")
+            N_runs_pbar.set_description(f"Runs for e={variance}")
             for _ in range(N):
-                self.dataset, self.dataset_name = self.generate_dataset(n, self.true_theta)
-                self.generate_initial_theta(e=e)
+                self.dataset, self.dataset_name = self.generate_dataset(n, self.true_param)
+                self.generate_initial_param(variance=variance)
 
                 # Run the experiment for each optimizer
-                theta_errors, hessian_inv_errors = self.run_track_errors(
+                param_errors, matrix_errors = self.run_track_errors(
                     pbars=[optimizer_pbar, data_pbar]
                 )
 
                 # Average the errors over the runs
-                for name, errors in theta_errors.items():
-                    theta_errors_avg[name] += np.array(errors) / N
-                if self.true_hessian_inv is not None:
-                    for name, errors in hessian_inv_errors.items():
-                        hessian_inv_errors_avg[name] += np.array(errors) / N
+                for name, errors in param_errors.items():
+                    param_errors_avg[name] += np.array(errors) / N
+                if self.true_matrix is not None:
+                    for name, errors in matrix_errors.items():
+                        matrix_errors_avg[name] += np.array(errors) / N
 
                 N_runs_pbar.update(1)
 
-            all_theta_errors_avg[e] = theta_errors_avg
-            all_hessian_inv_errors_avg[e] = hessian_inv_errors_avg
+            all_param_errors_avg[variance] = param_errors_avg
+            all_matrix_errors_avg[variance] = matrix_errors_avg
 
         data_pbar.close()
         optimizer_pbar.close()
         N_runs_pbar.close()
 
-        self.plot_all_errors(all_theta_errors_avg, all_hessian_inv_errors_avg, N)
+        self.plot_all_errors(all_param_errors_avg, all_matrix_errors_avg, N)
 
     def run_multiple_track_time(self, N: int = 100, n: int = 10_000):
         """
-        Run the experiment multiple times by generating a new dataset and initial theta each time.
-        Track the execution times and last theta errors for all optimizers, with batch sizes determined by batch_size_power_list.
+        Run the experiment multiple times by generating a new dataset and initial parameter each time.
+        Track the execution times and last paramter errors for all optimizers, with batch sizes determined by batch_size_power_list.
         Plot the execution times and errors for all optimizers in separate subplots with batch size on the x-axis.
         If there is only one batch size, the results are stored in lists to make boxplots.
         Args:
@@ -415,26 +425,26 @@ class Simulation:
         )
         data_pbar = tqdm(total=n, desc="Data", position=2, leave=False)
 
-        for i, e in enumerate(self.e_values):
+        for i, variance in enumerate(self.init_variances):
             # Initialize the error/time dictionaries
             if len(self.batch_size_power_list) == 1:
                 # If only one batch_size, store the results in lists to make boxplots
-                execution_times = {optimizer.name: [] for optimizer in self.optimizer_list}
-                last_theta_errors = {optimizer.name: [] for optimizer in self.optimizer_list}
+                execution_times = {name: [] for name in self.names_list}
+                last_param_errors = {name: [] for name in self.names_list}
             else:
                 # If multiple batch sizes, store the results in dictionaries to average over runs
-                execution_times = {optimizer.name: 0.0 for optimizer in self.optimizer_list}
-                last_theta_errors = {optimizer.name: 0.0 for optimizer in self.optimizer_list}
+                execution_times = {name: 0.0 for name in self.names_list}
+                last_param_errors = {name: 0.0 for name in self.names_list}
 
             N_runs_pbar.reset(total=N)
-            N_runs_pbar.set_description(f"{i+1}/{len(self.e_values)} Runs for e={e}")
+            N_runs_pbar.set_description(f"{i+1}/{len(self.init_variances)} Runs for e={variance}")
 
             for _ in range(N):
-                self.dataset, self.dataset_name = self.generate_dataset(n, self.true_theta)
-                self.generate_initial_theta(e=e)
+                self.dataset, self.dataset_name = self.generate_dataset(n, self.true_param)
+                self.generate_initial_param(variance=variance)
 
                 for batch_size_power in self.batch_size_power_list:
-                    self.batch_size = len(self.true_theta) ** batch_size_power
+                    self.batch_size = len(self.true_param) ** batch_size_power
                     times_run, errors_run = self.run_track_time(pbars=[optimizer_pbar, data_pbar])
 
                     if len(self.batch_size_power_list) == 1:
@@ -442,18 +452,18 @@ class Simulation:
                         for name, time in times_run.items():
                             execution_times[name].append(time)
                         for name, error in errors_run.items():
-                            last_theta_errors[name].append(error)
+                            last_param_errors[name].append(error)
                     else:
                         # Average the times and errors over the runs
                         for name, time in times_run.items():
                             execution_times[name][batch_size_power] += time / N
                         for name, error in errors_run.items():
-                            last_theta_errors[name][batch_size_power] += error / N
+                            last_param_errors[name][batch_size_power] += error / N
 
                 N_runs_pbar.update(1)
 
-            all_execution_times[e] = execution_times
-            all_metrics[e] = last_theta_errors
+            all_execution_times[variance] = execution_times
+            all_metrics[variance] = last_param_errors
 
         data_pbar.close()
         optimizer_pbar.close()
@@ -490,7 +500,7 @@ class Simulation:
 
             for idx, (name, errors) in enumerate(errors_dict.items()):
                 # Multiply the x-axis values by batch_size
-                batch_size = int(len(self.theta) ** self.batch_size_power_list[0])
+                batch_size = int(len(self.param) ** self.batch_size_power_list[0])
                 x_values = np.arange(0, len(errors) * batch_size, batch_size)
 
                 # Markers to distinguish the optimizers
@@ -511,24 +521,25 @@ class Simulation:
         fig.text(0.0, 0.5, ylabel, va="center", rotation="vertical")
 
         plt.suptitle(
-            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size power={self.batch_size_power}"
+            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, \
+                batch size power={self.batch_size_power}"
         )
         plt.tight_layout(pad=3.0)
         plt.show()
 
-    def plot_all_errors(self, all_theta_errors: dict, all_hessian_inv_errors: dict, N: int):
+    def plot_all_errors(self, all_param_errors: dict, all_matrix_errors: dict, N: int):
         """
-        Plot the errors of estimated theta and hessian inverse of all optimizers
+        Plot the estimation error of paramter and matrix of all optimizers
         """
         # Clear the cell output, because of tqdm bug widgets after reopen
         clear_output(wait=True)
 
-        if self.true_theta is not None:
+        if self.true_param is not None:
             ylabel = r"$\| \theta - \theta^* \|^2$"
-            self.plot_errors(all_theta_errors, ylabel, N)
-        if self.true_hessian_inv is not None:
+            self.plot_errors(all_param_errors, ylabel, N)
+        if self.true_matrix is not None:
             ylabel = r"$\| H^{-1} - H^{-1*} \|_F$"
-            self.plot_errors(all_hessian_inv_errors, ylabel, N)
+            self.plot_errors(all_matrix_errors, ylabel, N)
 
     @staticmethod
     def highlight_best(data, order: str):
@@ -550,10 +561,10 @@ class Simulation:
             )
 
     def boxplot_time_and_errors(
-        self, all_execution_times: dict, all_last_theta_error: dict, N: int
+        self, all_execution_times: dict, all_last_param_error: dict, N: int
     ):
         """
-        Make boxplots of the execution times and last theta errors of all optimizers using seaborn
+        Make boxplots of the execution times and last parameter errors of all optimizers using seaborn
         """
         # Clear the cell output, because of tqdm bug widgets after reopen
         clear_output(wait=True)
@@ -572,7 +583,7 @@ class Simulation:
 
             # Boxplot with seaborn
             box1 = sns.boxplot(data=all_execution_times[e], ax=ax1)
-            box2 = sns.boxplot(data=all_last_theta_error[e], ax=ax2)
+            box2 = sns.boxplot(data=all_last_param_error[e], ax=ax2)
 
             ax1.set_title(f"e={e}")
             ax1.set_ylabel("time (s)")
@@ -591,22 +602,23 @@ class Simulation:
         fig.legend(handles=handles, loc="center left", bbox_to_anchor=(1.0, 0.5), ncol=1)
 
         plt.suptitle(
-            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size power={self.batch_size_power}"
+            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, \
+            batch size power={self.batch_size_power}"
         )
         plt.tight_layout(rect=[0, 0, 1, 1])  # Adjust layout to make room for the legend
         plt.show()
 
-    def plot_time_and_errors(self, all_execution_times: dict, all_last_theta_errors: dict, N: int):
+    def plot_time_and_errors(self, all_execution_times: dict, all_last_param_errors: dict, N: int):
         """ """
-        num_e_values = len(self.e_values)
+        num_e_values = len(self.init_variances)
         fig, axes = plt.subplots(num_e_values, 2, figsize=(20, 6 * num_e_values), sharey=False)
 
         for i in range(num_e_values):
-            e = self.e_values[i]
+            e = self.init_variances[i]
             ax1, ax2 = axes[i]
 
             # Plot errors
-            for name, errors in all_last_theta_errors[e].items():
+            for name, errors in all_last_param_errors[e].items():
                 ax1.plot(self.batch_size_power_list, errors, label=name, marker="o")
             ax1.set_ylabel(ylabel=r"$\| \theta - \theta^* \|^2$")
             ax1.set_ylim(bottom=0)
@@ -620,7 +632,8 @@ class Simulation:
             ax1.set_title(f"e={e}")
 
         plt.suptitle(
-            f"{self.g.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, batch size powers={self.batch_size_power_list}"
+            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, \
+            batch size powers={self.batch_size_power_list}"
         )
         # plt.tight_layout(pad=3.0)
         plt.tight_layout()

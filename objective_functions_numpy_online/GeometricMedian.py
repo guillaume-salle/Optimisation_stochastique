@@ -24,7 +24,7 @@ class GeometricMedian(BaseObjectiveFunction):
         else:
             return np.linalg.norm(X - h, axis=1) - np.linalg.norm(X, axis=1)
 
-    def get_theta_dim(self, data: np.ndarray) -> int:
+    def get_param_dim(self, data: np.ndarray) -> int:
         """
         Return the dimension of theta
         """
@@ -73,9 +73,7 @@ class GeometricMedian(BaseObjectiveFunction):
             hessian_col[col] += 1 / norm
             return hessian_col
 
-    def grad_and_hessian(
-        self, data: np.ndarray, h: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def grad_and_hessian(self, data: np.ndarray, h: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Hessian of the objective function
         """
@@ -109,9 +107,7 @@ class GeometricMedian(BaseObjectiveFunction):
             hessian_col[col] += 1 / norm
             return grad, hessian_col
 
-    def riccati(
-        self, data: np.ndarray, h: np.ndarray, iter: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def riccati(self, data: np.ndarray, h: np.ndarray, iter: int) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the riccati term of the objective function
         """

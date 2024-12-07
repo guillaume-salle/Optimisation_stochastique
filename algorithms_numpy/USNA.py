@@ -10,6 +10,8 @@ class USNA(BaseOptimizer):
     Universal Stochastic Newton Algorithm optimizer, version described in the internship report.
     """
 
+    class_name = "USNA"
+
     def __init__(
         self,
         param: np.ndarray,
@@ -31,6 +33,8 @@ class USNA(BaseOptimizer):
             + ("W" if averaged and weight_exp != 0.0 else "")
             + ("A" if averaged else "")
             + "SNA"
+            + " AM" * averaged_matrix
+            + " AP" * compute_hessian_param_avg
             + (f" α={lr_exp}")
             + (f" γ={lr_hess_exp}" if lr_hess_exp != 0.75 else "")
         )
@@ -63,7 +67,7 @@ class USNA(BaseOptimizer):
         self.n_iter += 1
 
         # Update the hessian estimate and get the gradient from intermediate computation
-        grad = self.update_hessian(self.objective_function, data)
+        grad = self.update_hessian(data)
 
         # Update theta
         learning_rate_theta = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)

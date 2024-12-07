@@ -14,9 +14,7 @@ class pMeans(BaseObjectiveFunction):
         self.p = p
         self.atol = 1e-6
         if p < 1:
-            raise ValueError(
-                "The p-means objective function is only defined for p >= 1"
-            )
+            raise ValueError("The p-means objective function is only defined for p >= 1")
 
     def __call__(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
         """
@@ -28,7 +26,7 @@ class pMeans(BaseObjectiveFunction):
         else:
             return (np.linalg.norm(X - h, axis=1) ** self.p) / self.p
 
-    def get_theta_dim(self, data: np.ndarray) -> int:
+    def get_param_dim(self, data: np.ndarray) -> int:
         """
         Return the dimension of theta
         """
@@ -93,9 +91,7 @@ class pMeans(BaseObjectiveFunction):
             )
         else:
             safe_norm = norm
-        hessian_col = np.dot(
-            diff.T, -(2 - self.p) * safe_norm ** (self.p - 4) * diff[:, col] / n
-        )
+        hessian_col = np.dot(diff.T, -(2 - self.p) * safe_norm ** (self.p - 4) * diff[:, col] / n)
         hessian_col[col] += np.mean(safe_norm ** (self.p - 2))
         return hessian_col
 
@@ -118,15 +114,11 @@ class pMeans(BaseObjectiveFunction):
         else:
             safe_norm = norm
         grad = np.dot(diff.T, safe_norm ** (self.p - 2) / n)
-        hessian_col = np.dot(
-            diff.T, -(2 - self.p) * safe_norm ** (self.p - 4) * diff[:, col] / n
-        )
+        hessian_col = np.dot(diff.T, -(2 - self.p) * safe_norm ** (self.p - 4) * diff[:, col] / n)
         hessian_col[col] += np.mean(safe_norm ** (self.p - 2))
         return grad, hessian_col
 
-    def grad_and_hessian(
-        self, data: np.ndarray, h: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
+    def grad_and_hessian(self, data: np.ndarray, h: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Hessian of the objective function,
         returns Id if h is close to X, average over the batch.

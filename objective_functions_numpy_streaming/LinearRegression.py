@@ -30,7 +30,7 @@ class LinearRegression(BaseObjectiveFunction):
         Y_pred = np.dot(X, theta)
         return 0.5 * (Y_pred - y) ** 2
 
-    def get_theta_dim(self, data: Tuple[np.ndarray, np.ndarray]) -> int:
+    def get_param_dim(self, data: Tuple[np.ndarray, np.ndarray]) -> int:
         """
         Return the dimension of theta
         """

@@ -22,6 +22,8 @@ class SGD(BaseOptimizer):
     weight_exp (float): Exponent for the logarithmic weight.
     """
 
+    class_name = "SGD"
+
     def __init__(
         self,
         param: np.ndarray,
@@ -43,7 +45,7 @@ class SGD(BaseOptimizer):
         self.lr_const = lr_const
         self.lr_add_iter = lr_add_iter
 
-        super().__init__(param, objective_function, weight_exp)
+        super().__init__(param, objective_function, averaged, weight_exp)
 
     def step(
         self,
