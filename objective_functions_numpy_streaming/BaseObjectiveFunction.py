@@ -10,7 +10,7 @@ class BaseObjectiveFunction(ABC):
 
     @abstractmethod
     def __call__(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray
     ) -> np.ndarray:
         raise NotImplementedError
 
@@ -19,39 +19,41 @@ class BaseObjectiveFunction(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def grad(self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
+    def grad(
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray
+    ) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
     def hessian(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray
     ) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
     def grad_and_hessian(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
     @abstractmethod
     def hessian_column(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, z: int
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray, z: int
     ) -> np.ndarray:
         raise NotImplementedError
 
     @abstractmethod
     def grad_and_hessian_column(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, z: int
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray, z: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
     def riccati(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray, iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError("Riccati is not implemented for this objective function")
 
     def grad_and_riccati(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError("Riccati is not implemented for this objective function")

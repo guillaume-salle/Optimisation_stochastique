@@ -22,21 +22,19 @@ class SGD(BaseOptimizer):
     weight_exp (float): Exponent for the logarithmic weight.
     """
 
-    class_name = "SGD"
-
     def __init__(
         self,
         param: np.ndarray,
         objective_function: BaseObjectiveFunction,
-        lr_exp: float = 1.0,
+        lr_exp: float = 0.75,  # Do not use 1 for averaged algorithms
         lr_const: float = 1.0,
-        lr_add_iter: int = 20,
+        lr_add_iter: int = 0,
         averaged: bool = False,
-        weight_exp: float = 2.0,
+        log_weight: float = 2.0,
     ):
         # Name for plotting
         self.name = (
-            ("W" if averaged and weight_exp != 0.0 else "")
+            ("W" if averaged and log_weight != 0.0 else "")
             + ("A" if averaged else "")
             + "SGD"
             + (f" α={lr_exp}")
@@ -45,7 +43,7 @@ class SGD(BaseOptimizer):
         self.lr_const = lr_const
         self.lr_add_iter = lr_add_iter
 
-        super().__init__(param, objective_function, averaged, weight_exp)
+        super().__init__(param, objective_function, averaged, log_weight)
 
     def step(
         self,
@@ -64,4 +62,5 @@ class SGD(BaseOptimizer):
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
         self.param_not_averaged -= learning_rate * grad
 
-        self.update_averaged_param()
+        if self.averaged:
+            self.update_averaged_param()

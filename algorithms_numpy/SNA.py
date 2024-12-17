@@ -22,28 +22,28 @@ class SNA(BaseOptimizer):
     weight_exp (float): Exponent for the logarithmic weight.
     """
 
-    class_name = "SNA"
-
     def __init__(
         self,
         param: np.ndarray,
         objective_function: BaseObjectiveFunction,
-        lr_exp: float = 1.0,
+        lr_exp: float = None,  # Not specified in the article for WASNA, and set to 1.0 for SNA
         lr_const: float = 1.0,
-        lr_add_iter: int = 20,
-        identity_weight: int = 100,  # Weight more the initial identity matrix
+        lr_add_iter: int = 0,
+        identity_weight: int = 400,  # Weight more the initial identity matrix
         averaged: bool = False,  # Whether to use an averaged parameter
-        weight_exp: float = 2.0,  # Exponent for the logarithmic weight
+        log_weight: float = 2.0,  # Exponent for the logarithmic weight
         compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
         compute_inverse: bool = False,  # Actually compute inverse, or just solve the system
         sherman_morrison: bool = True,  # Whether to use the Sherman-Morrison formula
     ):
+        if lr_exp is None:
+            lr_exp = 1.0 if not averaged else 0.75
         self.name = (
-            ("W" if averaged and weight_exp != 0.0 else "")
+            ("W" if averaged and log_weight != 0.0 else "")
             + ("A" if averaged else "")
             + "SNA"
             + (f" α={lr_exp}")
-            + (f" τ_theta={weight_exp}" if weight_exp != 2.0 and weight_exp != 0.0 else "")
+            + (f" τ_theta={log_weight}" if log_weight != 2.0 and log_weight != 0.0 else "")
             + (" AP" if compute_hessian_param_avg else "")  # AP = Averaged Parameter
         )
         self.lr_exp = lr_exp
@@ -63,7 +63,7 @@ class SNA(BaseOptimizer):
             if compute_inverse:
                 self.hessian_inv = np.eye(param.shape[0])
 
-        super().__init__(param, objective_function, averaged, weight_exp)
+        super().__init__(param, objective_function, averaged, log_weight)
 
     def step(
         self,
@@ -95,7 +95,10 @@ class SNA(BaseOptimizer):
         else:  # faster and more stable, no need to compute the whole inverse
             self.param_not_averaged -= learning_rate * np.linalg.solve(self.hessian_bar, grad)
 
-        self.update_averaged_param()
+        if self.averaged:
+            self.update_averaged_param()
+
+    # TODO : factorize code with step
 
     def step_sherman_morrison(
         self,

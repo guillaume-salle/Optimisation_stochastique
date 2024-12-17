@@ -23,7 +23,7 @@ class BaseOptimizer(ABC):
         param: np.ndarray,
         objective_function: BaseObjectiveFunction,
         averaged: bool = False,
-        weight_exp: float = 0.0,
+        log_weight: float = 0.0,
     ) -> None:
         """
         Initialize the optimizer with parameters.
@@ -38,8 +38,9 @@ class BaseOptimizer(ABC):
         self.objective_function = objective_function
 
         self.averaged = averaged
+        # Copy the initial parameter if averaged, otherwise use the same
         self.param_not_averaged = np.copy(param) if averaged else param
-        self.weight_exp = weight_exp
+        self.log_weight = log_weight
         self.sum_weights = 0
 
         self.n_iter = 0
@@ -62,11 +63,8 @@ class BaseOptimizer(ABC):
         """
         Update the averaged parameter using the current parameter and the sum of weights.
         """
-        if not self.averaged:
-            return
-
-        if self.weight_exp > 0:
-            weight = np.log(self.n_iter + 1) ** self.weight_exp
+        if self.log_weight > 0:
+            weight = np.log(self.n_iter + 1) ** self.log_weight
         else:
             weight = 1
         self.sum_weights += weight

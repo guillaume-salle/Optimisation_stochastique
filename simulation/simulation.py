@@ -91,15 +91,20 @@ class Simulation:
         name are used as keys in the results dictionary and should be unique.
         Also, set the names_list for the optimizers.
         """
-        name_list = []
+        raw_list = []
+        names_list = []
         for optimizer_class in self.optimizer_list:
             optimizer = optimizer_class(
                 objective_function=self.objective_function, param=np.zeros(1)
             )
-            if optimizer.name in name_list:
-                raise ValueError(f"Duplicate optimizer name found: '{optimizer.name}'")
-            name_list.append(optimizer.name)
-        self.names_list = name_list
+            if optimizer.name in raw_list:
+                count = raw_list.count(optimizer.name)
+                name = f"{optimizer.name} ({count})"
+            else:
+                name = optimizer.name
+            names_list.append(name)
+            raw_list.append(optimizer.name)
+        self.names_list = names_list
 
     def generate_initial_param(self, variance: float = 1.0):
         """
@@ -181,7 +186,7 @@ class Simulation:
             data_pbar = tqdm(total=len(self.dataset), desc="Data", position=1, leave=False)
 
         # Run the experiment for each optimizer
-        for optimizer_class in self.optimizer_list:
+        for i, optimizer_class in enumerate(self.optimizer_list):
             data_pbar.reset(total=len(self.dataset))
 
             # Initialize the optimizer and parameter
@@ -192,6 +197,7 @@ class Simulation:
             optimizer = optimizer_class(
                 objective_function=self.objective_function, param=self.param
             )
+            optimizer.name = self.names_list[i]  # for duplicate names
             optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
@@ -256,7 +262,7 @@ class Simulation:
             data_pbar = tqdm(total=len(self.dataset), desc="Data", position=1, leave=False)
 
         # Run the experiment for each optimizer
-        for optimizer_class in self.optimizer_list:
+        for i, optimizer_class in enumerate(self.optimizer_list):
             data_pbar.reset(total=len(self.dataset))
 
             # Initialize the parameter
@@ -267,6 +273,7 @@ class Simulation:
             optimizer = optimizer_class(
                 objective_function=self.objective_function, param=self.param
             )
+            optimizer.name = self.names_list[i]  # for duplicate names
             optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
@@ -501,7 +508,8 @@ class Simulation:
             for idx, (name, errors) in enumerate(errors_dict.items()):
                 # Multiply the x-axis values by batch_size
                 batch_size = int(len(self.param) ** self.batch_size_power_list[0])
-                x_values = np.arange(0, len(errors) * batch_size, batch_size)
+                # plot the first error in the graph (shift by 1 the x-axis)
+                x_values = np.arange(1, len(errors) * batch_size + 1, batch_size)
 
                 # Markers to distinguish the optimizers
                 markevery = (idx / len(errors_dict), 0.2)
