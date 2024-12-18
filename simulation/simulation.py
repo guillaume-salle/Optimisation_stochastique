@@ -610,8 +610,8 @@ class Simulation:
         fig.legend(handles=handles, loc="center left", bbox_to_anchor=(1.0, 0.5), ncol=1)
 
         plt.suptitle(
-            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, \
-            batch size power={self.batch_size_power}"
+            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, "
+            + f"batch size power={self.batch_size_power}"
         )
         plt.tight_layout(rect=[0, 0, 1, 1])  # Adjust layout to make room for the legend
         plt.show()
