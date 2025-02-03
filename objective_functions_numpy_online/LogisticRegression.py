@@ -158,11 +158,11 @@ class LogisticRegression(BaseObjectiveFunction):
         hessian_col = p * (1 - p) * X[col] * X
         return grad, hessian_col
 
-    def riccati(
+    def sherman_morrison(
         self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Ricatti of the logistic loss, works only for a single data point
+        Compute the gradient and the Sherman-Morrison term of the logistic loss, works only for a single data point
         """
         X, _ = data
         X = X.squeeze()
@@ -170,16 +170,16 @@ class LogisticRegression(BaseObjectiveFunction):
             X = add_bias_1d(X)
         dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
-        ricatti = math.sqrt(p * (1 - p)) * X
+        sherman_morrison = math.sqrt(p * (1 - p)) * X
         # alpha = max(math.sqrt(p * (1 - p)), 1.0 / iter**0.25)  # cf article bercu
-        # riccati = alpha * X
-        return ricatti
+        # sherman_morrison = alpha * X
+        return sherman_morrison
 
-    def grad_and_riccati(
+    def grad_and_sherman_morrison(
         self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Ricatti of the logistic loss, works only for a single data point
+        Compute the gradient and the Sherman-Morrison term of the logistic loss, works only for a single data point
         """
         X, y = data
         X = X.squeeze()
@@ -188,7 +188,7 @@ class LogisticRegression(BaseObjectiveFunction):
         dot_product = np.dot(X, h)
         p = sigmoid(dot_product)
         grad = (p - y) * X
-        ricatti = np.sqrt(p * (1 - p)) * X
+        sherman_morrison = np.sqrt(p * (1 - p)) * X
         # alpha = max(math.sqrt(p * (1 - p)), 1.0 / iter**0.25)  # cf article bercu
-        # riccati = alpha * X
-        return grad, ricatti
+        # sherman_morrison = alpha * X
+        return grad, sherman_morrison

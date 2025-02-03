@@ -26,7 +26,7 @@ class SGD(BaseOptimizer):
         self,
         param: np.ndarray,
         objective_function: BaseObjectiveFunction,
-        lr_exp: float = 0.75,  # Do not use 1 for averaged algorithms
+        lr_exp: float = 0.67,  # Do not use 1 for averaged algorithms, nor for SGD since we dont know the minimal constant
         lr_const: float = 1.0,
         lr_add_iter: int = 0,
         averaged: bool = False,
@@ -38,6 +38,7 @@ class SGD(BaseOptimizer):
             + ("A" if averaged else "")
             + "SGD"
             + (f" α={lr_exp}")
+            + (f" c_α={lr_const}" if lr_const != 1.0 else "")
         )
         self.lr_exp = lr_exp
         self.lr_const = lr_const

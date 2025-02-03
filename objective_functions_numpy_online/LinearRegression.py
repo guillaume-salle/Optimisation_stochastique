@@ -107,24 +107,24 @@ class LinearRegression(BaseObjectiveFunction):
         hessian_col = X[col] * X
         return grad, hessian_col
 
-    def riccati(
+    def sherman_morrison(
         self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute and the Riccati term of the linear regression loss, works only for a single data point
+        Compute and the Sherman-Morrison term of the linear regression loss, works only for a single data point
         """
         X, _ = data
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        riccati = X
-        return riccati
+        sherman_morrison = X
+        return sherman_morrison
 
-    def grad_and_riccati(
+    def grad_and_sherman_morrison(
         self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Riccati of the linear regression loss, works only for a single data point
+        Compute the gradient and the Sherman-Morrison term of the linear regression loss, works only for a single data point
         """
         X, y = data
         X = X.squeeze()
@@ -132,5 +132,5 @@ class LinearRegression(BaseObjectiveFunction):
             X = add_bias_1d(X)
         Y_pred = np.dot(X, theta)
         grad = (Y_pred - y) * X
-        riccati = X
-        return grad, riccati
+        sherman_morrison = X
+        return grad, sherman_morrison

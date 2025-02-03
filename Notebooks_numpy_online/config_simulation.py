@@ -34,13 +34,13 @@ true_param = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
 # true_param = torch.tensor([1, 1, 1, 1, 1])  # Poly, bias=False
 
 # Whether or not a bias term is included
-bias_setting = True
 
 alpha_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 gamma_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 e_values = [1, 2]
 
 # Linear regression
+bias_setting = True
 simulation_linear_regression = partial(
     Simulation,
     objective_function=LinearRegression(bias=bias_setting),
@@ -52,6 +52,7 @@ simulation_linear_regression = partial(
 )
 
 # Logistic regression
+bias_setting = True
 simulation_logistic_regression = partial(
     Simulation,
     objective_function=LogisticRegression(bias=bias_setting),

@@ -41,8 +41,8 @@ class BaseOptimizer(ABC):
         # Copy the initial parameter if averaged, otherwise use the same
         self.param_not_averaged = np.copy(param) if averaged else param
         self.log_weight = log_weight
-        self.sum_weights = 0
 
+        self.sum_weights = 0
         self.n_iter = 0
 
     @abstractmethod

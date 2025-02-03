@@ -80,7 +80,7 @@ class SNA(BaseOptimizer):
         if self.compute_hessian_param_avg:  # cf article
             grad = self.objective_function.grad(data, self.param_not_averaged)
             hessian = self.objective_function.hessian(data, self.param)
-        else:  # faster, allow to re-ure the grad from hessian computation
+        else:  # faster, allow to re-use the grad from hessian computation
             grad, hessian = self.objective_function.grad_and_hessian(data, self.param_not_averaged)
 
         # Update the running average of the Hessian
@@ -98,8 +98,6 @@ class SNA(BaseOptimizer):
         if self.averaged:
             self.update_averaged_param()
 
-    # TODO : factorize code with step
-
     def step_sherman_morrison(
         self,
         data: np.ndarray | Tuple[np.ndarray, np.ndarray],
@@ -113,21 +111,22 @@ class SNA(BaseOptimizer):
         self.n_iter += 1
         if self.compute_hessian_param_avg:  # cf article
             grad = self.objective_function.grad(data, self.param_not_averaged)
-            phi = self.objective_function.sherman_morrison(data, self.param)
-        else:  # faster, allow to re-ure the grad from hessian computation
-            grad, phi = self.objective_function.grad_and_sherman_morrison(
+            sherman_morrison = self.objective_function.sherman_morrison(data, self.param)
+        else:  # faster, allow to re-use the grad from hessian computation
+            grad, sherman_morrison = self.objective_function.grad_and_sherman_morrison(
                 data, self.param_not_averaged
             )
 
         # Update the inverse Hessian matrix using the Sherman-Morrison equation
         n_matrix = self.n_iter + self.identity_weight
-        product = np.dot(self.hessian_inv, phi) / n_matrix
+        product = np.dot(self.hessian_inv, sherman_morrison) / n_matrix
         self.hessian_inv -= (1 / n_matrix) * self.hessian_inv + np.outer(
-            product, product / (n_matrix ** (-1) + np.dot(phi, product))
+            product, product / (n_matrix ** (-1) + np.dot(sherman_morrison, product))
         )
 
         # Update the non averaged parameter
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
         self.param_not_averaged -= learning_rate * self.hessian_inv @ grad
 
-        self.update_averaged_param()
+        if self.averaged:
+            self.update_averaged_param()

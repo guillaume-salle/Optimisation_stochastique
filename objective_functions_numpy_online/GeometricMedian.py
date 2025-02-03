@@ -107,44 +107,46 @@ class GeometricMedian(BaseObjectiveFunction):
             hessian_col[col] += 1 / norm
             return grad, hessian_col
 
-    def riccati(self, data: np.ndarray, h: np.ndarray, iter: int) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Compute the riccati term of the objective function
-        """
-        X = data.squeeze()
-        d = h.shape[0]
-        diff = h - X
-        norm = np.linalg.norm(diff)
-        if norm < self.atol:  # Randomly select a direction for the Riccati term,
-            # so the outer product averages to the identity matrix
-            z = np.random.randint(0, d)
-            riccati = np.zeros_like(h)
-            riccati[z] = math.sqrt(d)
-            return np.zeros_like(h), riccati
-        grad = diff / norm
-        Z = np.random.randn(d)
-        alpha = 1 / (iter * math.log(iter + 1))
-        riccati = (self.grad(X, h + alpha * Z) - grad) * np.sqrt(norm) / alpha
-        return riccati
-
-    def grad_and_riccati(
+    def sherman_morrison(
         self, data: np.ndarray, h: np.ndarray, iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and riccati term of the objective function
+        Compute the Sherman-Morrison term of the objective function
         """
         X = data.squeeze()
         d = h.shape[0]
         diff = h - X
         norm = np.linalg.norm(diff)
-        if norm < self.atol:  # Randomly select a direction for the Riccati term,
+        if norm < self.atol:  # Randomly select a direction for the sherman_morrison term,
             # so the outer product averages to the identity matrix
             z = np.random.randint(0, d)
-            riccati = np.zeros_like(h)
-            riccati[z] = math.sqrt(d)
-            return np.zeros_like(h), riccati
+            sherman_morrison = np.zeros_like(h)
+            sherman_morrison[z] = math.sqrt(d)
+            return np.zeros_like(h), sherman_morrison
         grad = diff / norm
         Z = np.random.randn(d)
         alpha = 1 / (iter * math.log(iter + 1))
-        riccati = (self.grad(X, h + alpha * Z) - grad) * np.sqrt(norm) / alpha
-        return grad, riccati
+        sherman_morrison = (self.grad(X, h + alpha * Z) - grad) * np.sqrt(norm) / alpha
+        return sherman_morrison
+
+    def grad_and_sherman_morrison(
+        self, data: np.ndarray, h: np.ndarray, iter: int
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Compute the gradient and Sherman_Morrison term of the objective function
+        """
+        X = data.squeeze()
+        d = h.shape[0]
+        diff = h - X
+        norm = np.linalg.norm(diff)
+        if norm < self.atol:  # Randomly select a direction for the sherman_morrison term,
+            # so the outer product averages to the identity matrix
+            z = np.random.randint(0, d)
+            sherman_morrison = np.zeros_like(h)
+            sherman_morrison[z] = math.sqrt(d)
+            return np.zeros_like(h), sherman_morrison
+        grad = diff / norm
+        Z = np.random.randn(d)
+        alpha = 1 / (iter * math.log(iter + 1))
+        sherman_morrison = (self.grad(X, h + alpha * Z) - grad) * np.sqrt(norm) / alpha
+        return grad, sherman_morrison
