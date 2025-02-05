@@ -22,6 +22,8 @@ class SNA(BaseOptimizer):
     weight_exp (float): Exponent for the logarithmic weight.
     """
 
+    DEFAULT_LR_EXP = 0.67  # for non-averaged
+
     def __init__(
         self,
         param: np.ndarray,
@@ -37,7 +39,7 @@ class SNA(BaseOptimizer):
         sherman_morrison: bool = True,  # Whether to use the Sherman-Morrison formula
     ):
         if lr_exp is None:
-            lr_exp = 1.0 if not averaged else 0.75
+            lr_exp = 1.0 if not averaged else self.DEFAULT_LR_EXP
         self.name = (
             ("W" if averaged and log_weight != 0.0 else "")
             + ("A" if averaged else "")
@@ -57,7 +59,7 @@ class SNA(BaseOptimizer):
         if sherman_morrison and hasattr(objective_function, "sherman_morrison"):
             self.step = self.step_sherman_morrison
             self.hessian_inv = np.eye(param.shape[0])
-            self.name += " SM"
+            self.name += " S-M"
         else:
             self.hessian_bar = np.eye(param.shape[0])
             if compute_inverse:
@@ -114,7 +116,7 @@ class SNA(BaseOptimizer):
             sherman_morrison = self.objective_function.sherman_morrison(data, self.param)
         else:  # faster, allow to re-use the grad from hessian computation
             grad, sherman_morrison = self.objective_function.grad_and_sherman_morrison(
-                data, self.param_not_averaged
+                data, self.param_not_averaged, self.n_iter  # n_iter + lr_add_iter ??
             )
 
         # Update the inverse Hessian matrix using the Sherman-Morrison equation

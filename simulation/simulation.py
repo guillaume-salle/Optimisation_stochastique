@@ -529,8 +529,8 @@ class Simulation:
         fig.text(0.0, 0.5, ylabel, va="center", rotation="vertical")
 
         plt.suptitle(
-            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, \
-                batch size power={self.batch_size_power}"
+            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, "
+            + f"batch size power={self.batch_size_power}"
         )
         plt.tight_layout(pad=3.0)
         plt.show()
@@ -640,8 +640,8 @@ class Simulation:
             ax1.set_title(f"e={e}")
 
         plt.suptitle(
-            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, \
-            batch size powers={self.batch_size_power_list}"
+            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, "
+            + f"batch size power={self.batch_size_power}"
         )
         # plt.tight_layout(pad=3.0)
         plt.tight_layout()
