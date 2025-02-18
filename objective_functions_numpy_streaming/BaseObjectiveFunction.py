@@ -48,12 +48,13 @@ class BaseObjectiveFunction(ABC):
     ) -> Tuple[np.ndarray, np.ndarray]:
         raise NotImplementedError
 
-    def riccati(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray, iter: int
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        raise NotImplementedError("Riccati is not implemented for this objective function")
+    # Methods to be implemented if random hessians are rank 1
+    # def sherman_morrison(
+    #     self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray, n_iter: int
+    # ) -> Tuple[np.ndarray, np.ndarray]:
+    #     raise NotImplementedError("sherman_morrison is not implemented for this objective function")
 
-    def grad_and_riccati(
-        self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        raise NotImplementedError("Riccati is not implemented for this objective function")
+    # def grad_and_sherman_morrison(
+    #     self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], param: np.ndarray, n_iter: int
+    # ) -> Tuple[np.ndarray, np.ndarray]:
+    #     raise NotImplementedError("sherman_morrison is not implemented for this objective function")

@@ -13,13 +13,13 @@ class SphericalDistribution(BaseObjectiveFunction):
         self.name = "Spherical Distribution"
         self.atol = 1e-6
 
-    def __call__(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+    def __call__(self, data: np.ndarray, param: np.ndarray) -> np.ndarray:
         """
         Compute the objective function over a batch of data
         """
         X = data
-        a = h[:-1]
-        b = h[-1]
+        a = param[:-1]
+        b = param[-1]
         if X.ndim == 1:
             return 0.5 * (np.linalg.norm(X - a) - b) ** 2
         else:
@@ -32,17 +32,17 @@ class SphericalDistribution(BaseObjectiveFunction):
         X = data
         return X.shape[-1] + 1
 
-    def grad(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+    def grad(self, data: np.ndarray, param: np.ndarray) -> np.ndarray:
         """
         Compute the gradient of the objective function, average over the batch
         """
         X = data
         n = X.shape[0]
-        a = h[:-1]
-        b = h[-1]
+        a = param[:-1]
+        b = param[-1]
         diff = X - a
         norm = np.linalg.norm(diff, axis=1)
-        grad = np.empty_like(h)
+        grad = np.empty_like(param)
         safe_inv_norm = np.where(
             np.isclose(norm, np.zeros(n), atol=self.atol),
             np.ones(n),
@@ -52,15 +52,15 @@ class SphericalDistribution(BaseObjectiveFunction):
         grad[-1] = b - np.mean(norm)
         return grad
 
-    def hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+    def hessian(self, data: np.ndarray, param: np.ndarray) -> np.ndarray:
         """
         Compute the Hessian of the objective function, returns Id if h is close to X,
         average over the batch
         """
         X = data
-        n, d = X.shape[0], h.size
-        a = h[:-1]
-        b = h[-1]
+        n, d = X.shape[0], param.size
+        a = param[:-1]
+        b = param[-1]
         diff = X - a
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
@@ -77,14 +77,14 @@ class SphericalDistribution(BaseObjectiveFunction):
         hessian[-1, -1] = 1
         return hessian
 
-    def hessian_column(self, data: np.ndarray, h: np.ndarray, col: int) -> np.ndarray:
+    def hessian_column(self, data: np.ndarray, param: np.ndarray, col: int) -> np.ndarray:
         """
         Compute a single column of the hessian of the objective function
         """
         X = data
         n = X.shape[0]
-        a = h[:-1]
-        b = h[-1]
+        a = param[:-1]
+        b = param[-1]
         diff = X - a
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
@@ -92,8 +92,8 @@ class SphericalDistribution(BaseObjectiveFunction):
             np.ones(n),
             1 / norm,
         )
-        hessian_column = np.empty_like(h)
-        if col < len(h) - 1:
+        hessian_column = np.empty_like(param)
+        if col < len(param) - 1:
             hessian_column[:-1] = np.dot(diff.T, b * safe_inv_norm**3 * diff[:, col]) / n
             hessian_column[col] += 1 - b * np.mean(safe_inv_norm)
             hessian_column[-1] = np.mean(diff[:, col] * safe_inv_norm)
@@ -102,15 +102,15 @@ class SphericalDistribution(BaseObjectiveFunction):
             hessian_column[-1] = 1
         return hessian_column
 
-    def grad_and_hessian(self, data: np.ndarray, h: np.ndarray) -> np.ndarray:
+    def grad_and_hessian(self, data: np.ndarray, param: np.ndarray) -> np.ndarray:
         """
         Compute the grad and Hessian of the objective function,
         returns Id if h is close to X, average over the batch
         """
         X = data
-        n, d = X.shape[0], h.size
-        a = h[:-1]
-        b = h[-1]
+        n, d = X.shape[0], param.size
+        a = param[:-1]
+        b = param[-1]
         diff = X - a
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
@@ -131,15 +131,15 @@ class SphericalDistribution(BaseObjectiveFunction):
         return grad, hessian
 
     def grad_and_hessian_column(
-        self, data: np.ndarray, h: np.ndarray, col: int
+        self, data: np.ndarray, param: np.ndarray, col: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute a single column of the grad and Hessian of the objective function
         """
         X = data
         n = X.shape[0]
-        a = h[:-1]
-        b = h[-1]
+        a = param[:-1]
+        b = param[-1]
         diff = X - a
         norm = np.linalg.norm(diff, axis=1)
         safe_inv_norm = np.where(
@@ -150,8 +150,8 @@ class SphericalDistribution(BaseObjectiveFunction):
         grad_a = np.dot(diff.T, -1 + b * safe_inv_norm) / n
         grad_b = b - np.mean(norm)
         grad = np.append(grad_a, grad_b)
-        hessian_column = np.empty_like(h)
-        if col < len(h) - 1:
+        hessian_column = np.empty_like(param)
+        if col < len(param) - 1:
             hessian_column[:-1] = np.dot(diff.T, b * safe_inv_norm**3 * diff[:, col]) / n
             hessian_column[col] += 1 - b * np.mean(safe_inv_norm)
             hessian_column[-1] = np.mean(diff[:, col] * safe_inv_norm)

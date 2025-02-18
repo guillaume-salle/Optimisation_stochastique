@@ -11,12 +11,18 @@ def generate_linear_regression(
     """
     name = "linear regression"
 
-    d = len(true_theta)
+    CONST_TOEPLITZ = 0.9
+
+    d = len(true_theta) - 1 if bias else len(true_theta)
+    covariance_matrix = np.zeros((d, d))
+    for i in range(d):
+        for j in range(d):
+            covariance_matrix[i, j] = CONST_TOEPLITZ ** abs(i - j)
+
+    X = np.random.multivariate_normal(mean=np.zeros(d), cov=covariance_matrix, size=n)
     if bias:
-        X = np.random.standard_normal((n, d - 1))
         phi = np.hstack([np.ones((n, 1)), X])
     else:
-        X = np.random.standard_normal((n, d))
         phi = X
 
     Y = phi @ true_theta + np.random.standard_normal((n))

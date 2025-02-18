@@ -64,15 +64,6 @@ class SNA(BaseOptimizer):
         self.compute_inverse = compute_inverse
         self.sherman_morrison = sherman_morrison
 
-        if sherman_morrison and hasattr(obj_function, "sherman_morrison"):
-            self.name += " SM"
-            self.step = self.step_sherman_morrison
-            self.hessian_inv = np.eye(param.shape[0])
-        else:
-            self.hessian_bar = np.eye(param.shape[0])
-            if compute_inverse:
-                self.hessian_inv = np.eye(param.shape[0])
-
         super().__init__(
             param=param,
             obj_function=obj_function,
@@ -81,6 +72,16 @@ class SNA(BaseOptimizer):
             averaged=averaged,
             log_weight=log_weight,
         )
+
+        # For batch_size=1 we can use Sherman-Morrison formula if available
+        if batch_size == 1 and sherman_morrison and hasattr(obj_function, "sherman_morrison"):
+            self.name += " SM"
+            self.step = self.step_sherman_morrison
+            self.hessian_inv = np.eye(param.shape[0])
+        else:
+            self.hessian_bar = np.eye(param.shape[0])
+            if compute_inverse:
+                self.hessian_inv = np.eye(param.shape[0])
 
     def step(
         self,

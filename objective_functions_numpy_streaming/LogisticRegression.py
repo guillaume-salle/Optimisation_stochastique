@@ -54,7 +54,7 @@ class LogisticRegression(BaseObjectiveFunction):
         dot_product = np.dot(X, h)
         return np.log(1 + np.exp(dot_product)) - dot_product * y
 
-    def evaluate_accuracy(self, dataset: MyDataset, h: np.ndarray, batch_size=512) -> float:
+    def evaluate_accuracy(self, dataset: MyDataset, param: np.ndarray, batch_size=512) -> float:
         """
         Compute the accuracy of the model
         """
@@ -67,7 +67,7 @@ class LogisticRegression(BaseObjectiveFunction):
             Y_batch = Y[i : i + batch_size]
             if self.bias:
                 X_batch = add_bias(X_batch)
-            dot_product = np.dot(X_batch, h)
+            dot_product = np.dot(X_batch, param)
             p = sigmoid_array(dot_product)
             predictions = (p > 0.5).astype(int)
             correct_predictions += np.sum(predictions == Y_batch)
@@ -85,7 +85,7 @@ class LogisticRegression(BaseObjectiveFunction):
         else:
             return X.shape[-1]
 
-    def grad(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
+    def grad(self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray) -> np.ndarray:
         """
         Compute the gradient of the logistic loss, average over the batch
         """
@@ -93,12 +93,12 @@ class LogisticRegression(BaseObjectiveFunction):
         n = X.shape[0]
         if self.bias:
             X = add_bias(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid_array(dot_product)
         grad = np.dot(X.T, p - y) / n
         return grad
 
-    def hessian(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
+    def hessian(self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray) -> np.ndarray:
         """
         Compute the Hessian of the logistic loss, average over the batch
         """
@@ -106,13 +106,13 @@ class LogisticRegression(BaseObjectiveFunction):
         n = X.shape[0]
         if self.bias:
             X = add_bias(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid_array(dot_product)
         hessian = np.einsum("n,ni,nj->ij", p * (1 - p) / n, X, X)
         return hessian
 
     def hessian_column(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, col: int
+        self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray, col: int
     ) -> np.ndarray:
         """
         Compute a single column of the hessian of the objective function
@@ -121,13 +121,13 @@ class LogisticRegression(BaseObjectiveFunction):
         n = X.shape[0]
         if self.bias:
             X = add_bias(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid_array(dot_product)
         hessian_col = np.dot(X.T, p * (1 - p) * X[:, col]) / n
         return hessian_col
 
     def grad_and_hessian_column(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, col: int
+        self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray, col: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and a single column of the hessian of the objective function
@@ -136,14 +136,14 @@ class LogisticRegression(BaseObjectiveFunction):
         n = X.shape[0]
         if self.bias:
             X = add_bias(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid_array(dot_product)
         grad = np.dot(X.T, p - y) / n
         hessian_col = np.dot(X.T, p * (1 - p) * X[:, col]) / n
         return grad, hessian_col
 
     def grad_and_hessian(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray
+        self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Hessian of the logistic loss, average over the batch
@@ -152,47 +152,48 @@ class LogisticRegression(BaseObjectiveFunction):
         n = X.shape[0]
         if self.bias:
             X = add_bias(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid_array(dot_product)
         grad = np.dot(X.T, p - y) / n
         hessian = np.einsum("n,ni,nj->ij", p * (1 - p) / n, X, X)
         return grad, hessian
 
-    def riccati(
-        self, data: Tuple, h: np.ndarray, iter: int = None
+    def sherman_morrison(
+        self, data: Tuple, param: np.ndarray, n_iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the ricatti term of the logistic loss, works only with a batch of size 1
+        Compute the gradient and the Sherman-Morrison term of the logistic loss,
+        works only for a batch_size of 1
         """
         X, _ = data
         n = X.shape[0]
         if n != 1:
-            raise ValueError("The Riccati term is only defined for a single data point")
+            raise ValueError("The Sherman-Morrison update is only possible for a batch size of 1")
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid(dot_product)
         ricatti = math.sqrt(p * (1 - p)) * X
         # alpha = max(math.sqrt(p * (1 - p)), 1.0 / iter**0.25)  # cf article bercu
         # riccati = alpha * X
         return ricatti
 
-    def grad_and_riccati(
-        self, data: Tuple, h: np.ndarray, iter: int = None
+    def grad_and_sherman_morrison(
+        self, data: Tuple, param: np.ndarray, n_iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Ricatti of the logistic loss,
+        Compute the gradient and the Sherman-Morrison term of the logistic loss,
         works only with a batch of size 1
         """
         X, y = data
         n = X.shape[0]
         if n != 1:
-            raise ValueError("The Riccati term is only defined for a single data point")
+            raise ValueError("The Sherman-Morrison update is only possible for a batch size of 1")
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid(dot_product)
         grad = (p - y) * X
         ricatti = math.sqrt(p * (1 - p)) * X

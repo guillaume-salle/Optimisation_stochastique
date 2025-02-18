@@ -27,14 +27,17 @@ def generate_geometric_median(
     """
     name = "multivariate normal"
 
+    CONST_TOEPLITZ = 0.9
+
     d = len(true_theta)
+    # For random covariane matrix, not implemented
     # if eigenvalues is None:
     #     eigenvalues = np.logspace(-2, 2, d)
     # covariance_matrix = generate_covariance_matrix(d, eigenvalues)
     covariance_matrix = np.zeros((d, d))
     for i in range(d):
         for j in range(d):
-            covariance_matrix[i, j] = 0.5 ** abs(i - j)
+            covariance_matrix[i, j] = CONST_TOEPLITZ ** abs(i - j)
 
     X = np.random.multivariate_normal(mean=true_theta, cov=covariance_matrix, size=n)
     return MyDataset(X=X), name

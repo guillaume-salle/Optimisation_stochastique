@@ -22,7 +22,7 @@ from datasets_numpy import (
 
 
 # Configuration for the number of runs and size of data
-N = 20
+N = 10
 n = int(1e4)
 
 # Configuration for true parameter
@@ -35,7 +35,7 @@ true_param = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
 
 alpha_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 gamma_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
-e_values = [1, 2]
+r_values = [1, 2]
 
 # Linear regression
 bias_setting = True
@@ -44,7 +44,7 @@ simulation_linear_regression = partial(
     obj_function=LinearRegression(bias=bias_setting),
     true_param=true_param,
     generate_dataset=partial(generate_linear_regression, bias=bias_setting),
-    e_values=e_values,
+    r_values=r_values,
 )
 
 # Logistic regression
@@ -54,7 +54,7 @@ simulation_logistic_regression = partial(
     obj_function=LogisticRegression(bias=bias_setting),
     true_param=true_param,
     generate_dataset=partial(generate_logistic_regression, bias=bias_setting),
-    e_values=e_values,
+    r_values=r_values,
 )
 
 # Geometric median
@@ -64,7 +64,7 @@ simulation_geometric_median = partial(
     obj_function=GeometricMedian(),
     true_param=true_param_geometric_median,
     generate_dataset=generate_geometric_median,
-    e_values=e_values,
+    r_values=r_values,
 )
 
 # Spherical distribution
@@ -77,7 +77,7 @@ simulation_spherical_distribution = partial(
     obj_function=SphericalDistribution(),
     true_param=true_param_spherical_distribution,
     generate_dataset=partial(generate_spherical_distribution, delta=delta),
-    e_values=[0.5, 1],
+    r_values=[0.5, 1],
 )
 
 
@@ -90,7 +90,7 @@ simulation_p_means = partial(
     obj_function=pMeans(p=p),
     true_param=true_param_p_means,
     generate_dataset=generate_p_means,
-    e_values=e_values,
+    r_values=r_values,
 )
 
 # Covtype
@@ -104,5 +104,5 @@ eval_covtype = partial(
     test_dataset=test_covtype,
     dataset_name=name,
     initial_param=np.zeros(54 + 1),
-    e_values=None,
+    r_values=None,
 )

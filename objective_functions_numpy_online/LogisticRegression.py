@@ -41,7 +41,7 @@ class LogisticRegression(BaseObjectiveFunction):
         self.name = "Logistic"
         self.bias = bias
 
-    def __call__(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
+    def __call__(self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray) -> np.ndarray:
         """
         Compute the logistic loss, works with a batch or a single data point
         """
@@ -51,10 +51,10 @@ class LogisticRegression(BaseObjectiveFunction):
                 X = add_bias_1d(X)
             else:
                 X = add_bias(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         return np.log(1 + np.exp(dot_product)) - dot_product * y
 
-    def evaluate_accuracy(self, dataset: MyDataset, h: np.ndarray, batch_size=512) -> float:
+    def evaluate_accuracy(self, dataset: MyDataset, param: np.ndarray, batch_size=512) -> float:
         """
         Compute the accuracy of the model
         """
@@ -67,7 +67,7 @@ class LogisticRegression(BaseObjectiveFunction):
             Y_batch = Y[i : i + batch_size]
             if self.bias:
                 X_batch = add_bias(X_batch)
-            dot_product = np.dot(X_batch, h)
+            dot_product = np.dot(X_batch, param)
             p = sigmoid_torch(dot_product)
             predictions = (p > 0.5).astype(int)
             correct_predictions += np.sum(predictions == Y_batch)
@@ -85,7 +85,7 @@ class LogisticRegression(BaseObjectiveFunction):
         else:
             return X.shape[-1]
 
-    def grad(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
+    def grad(self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray) -> np.ndarray:
         """
         Compute the gradient of the logistic loss, works only for a single data point
         """
@@ -93,12 +93,12 @@ class LogisticRegression(BaseObjectiveFunction):
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid(dot_product)
         grad = (p - y) * X
         return grad
 
-    def hessian(self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray) -> np.ndarray:
+    def hessian(self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray) -> np.ndarray:
         """
         Compute the Hessian of the logistic loss, works only for a single data point
         """
@@ -106,13 +106,13 @@ class LogisticRegression(BaseObjectiveFunction):
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid(dot_product)
         hessian = p * (1 - p) * np.outer(X, X)
         return hessian
 
     def hessian_column(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, col: int
+        self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray, col: int
     ) -> np.ndarray:
         """
         Compute a single column of the logistic loss, works only for a single data point
@@ -121,13 +121,13 @@ class LogisticRegression(BaseObjectiveFunction):
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid(dot_product)
         hessian_col = p * (1 - p) * X[col] * X
         return hessian_col
 
     def grad_and_hessian(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray
+        self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Hessian of the logistic loss, works only for a single data point
@@ -136,14 +136,14 @@ class LogisticRegression(BaseObjectiveFunction):
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid(dot_product)
         grad = (p - y) * X
         hessian = p * (1 - p) * np.outer(X, X)
         return grad, hessian
 
     def grad_and_hessian_column(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, col: int
+        self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray, col: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and a single column of the logistic loss, works only for a single data point
@@ -152,23 +152,23 @@ class LogisticRegression(BaseObjectiveFunction):
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid(dot_product)
         grad = (p - y) * X
         hessian_col = p * (1 - p) * X[col] * X
         return grad, hessian_col
 
     def sherman_morrison(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, n_iter: int = None
+        self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray, n_iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Sherman-Morrison term of the logistic loss, works only for a single data point
+        Compute the Sherman-Morrison term of the logistic loss, works only for a batch_size of 1
         """
         X, _ = data
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid(dot_product)
         sherman_morrison = math.sqrt(p * (1 - p)) * X
         # alpha = max(math.sqrt(p * (1 - p)), 1.0 / iter**0.25)  # cf article bercu
@@ -176,16 +176,17 @@ class LogisticRegression(BaseObjectiveFunction):
         return sherman_morrison
 
     def grad_and_sherman_morrison(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, n_iter: int = None
+        self, data: Tuple[np.ndarray, np.ndarray], param: np.ndarray, n_iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
-        Compute the gradient and the Sherman-Morrison term of the logistic loss, works only for a single data point
+        Compute the gradient and the Sherman-Morrison term of the logistic loss,
+        works only for a batch of size 1
         """
         X, y = data
         X = X.squeeze()
         if self.bias:
             X = add_bias_1d(X)
-        dot_product = np.dot(X, h)
+        dot_product = np.dot(X, param)
         p = sigmoid(dot_product)
         grad = (p - y) * X
         sherman_morrison = np.sqrt(p * (1 - p)) * X

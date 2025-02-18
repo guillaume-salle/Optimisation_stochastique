@@ -40,7 +40,7 @@ class Simulation:
         true_param: np.ndarray | torch.Tensor = None,
         true_matrix: np.ndarray | torch.Tensor = None,
         initial_param: np.ndarray | torch.Tensor = None,
-        e_values: List[float] = [1.0, 2.0],  # noise level for initial parameter
+        r_values: List[float] = [1.0, 5.0],  # noise level for initial parameter
         use_torch: bool = False,
         device: str = None,
     ):
@@ -48,9 +48,9 @@ class Simulation:
         Initialize the experiment
         """
         if generate_dataset is None and dataset is None:
-            raise ValueError("create_dataset or dataset should be set")
+            raise ValueError("Either `generate_dataset` or `dataset` must be provided.")
         if generate_dataset is not None and true_param is None:
-            raise ValueError("true_param should be set if create_dataset is set")
+            raise ValueError("`true_param` must be provided if `generate_dataset` is set")
 
         self.true_param = true_param
         self.true_matrix = true_matrix
@@ -60,15 +60,13 @@ class Simulation:
         self.dataset = dataset
         self.test_dataset = test_dataset
         self.dataset_name = dataset_name
-        self.true_param = true_param
         self.true_matrix = true_matrix
-        self.use_torch = isinstance(true_param, torch.Tensor) or use_torch
         self.initial_param = initial_param
-        self.init_variances = e_values
+        self.initial_variances = r_values
         self.check_duplicate_names()
 
         # Set the device for torch tensors
-        self.use_torch = use_torch
+        self.use_torch = isinstance(true_param, torch.Tensor) or use_torch
         if use_torch:
             self.device = torch.device(device)
             if device is None:
@@ -136,15 +134,15 @@ class Simulation:
         # Log the estimation error of the parameter
         diff = self.param - self.true_param
         param_error = np.dot(diff, diff) if not self.use_torch else torch.dot(diff, diff).item()
-        param_errors[optimizer.name].append(param_error)
+        param_errors[optimizer.name].append((n, param_error))
 
         # Log the estimation error of condition matrix estimation if a true matrix is provided
         if self.true_matrix is not None and hasattr(optimizer, "matrix"):
             diff = optimizer.matrix - self.true_matrix
             if not self.use_torch:
-                matrix_error = np.linalg.norm(diff, ord="fro")
+                matrix_error = np.linalg.norm(diff, ord="fro") ** 2
             else:
-                matrix_error = torch.norm(diff, p="fro").item()
+                matrix_error = torch.norm(diff, p="fro").item() ** 2
             matrix_errors[optimizer.name].append((n, matrix_error))
 
     def run_track_errors(
@@ -280,6 +278,7 @@ class Simulation:
             time_end = time.time()
             execution_times[optimizer.name] = time_end - time_start
             if metrics == "last parameter error":
+                # TODO: ensure torch compatibility
                 metrics_dict[optimizer.name] = np.dot(
                     self.param - self.true_param, self.param - self.true_param
                 )
@@ -347,7 +346,8 @@ class Simulation:
 
         # Initialize error dictionaries to hold results for all the initial variances
         all_param_errors_avg = {}
-        all_matrix_errors_avg = {}
+        if self.true_matrix is not None:
+            all_matrix_errors_avg = {}
 
         # tqdm with VScode bugs, have to initialize the bars outside and reset in the loop
         N_runs_pbar = tqdm(range(N), position=0, leave=False)
@@ -356,17 +356,15 @@ class Simulation:
         )
         data_pbar = tqdm(total=n, desc="Data", position=2, leave=False)
 
-        for variance in self.init_variances:
+        for variance in self.initial_variances:
             # Initialize the error dictionaries for this variance for initial parameter
             param_errors_avg = {name: 0.0 for name in self.names_list}
             if self.true_matrix is not None:
-                matrix_errors_avg = {optimizer.name: 0.0 for optimizer in self.optimizer_list}
-            else:
-                matrix_errors_avg = None
+                matrix_errors_avg = {name: 0.0 for name in self.names_list}
 
             # Loop of N simulations, each with a new dataset and initial paramter
             N_runs_pbar.reset(total=N)
-            N_runs_pbar.set_description(f"Runs for e={variance}")
+            N_runs_pbar.set_description(f"Runs for r={variance}")
             for _ in range(N):
                 self.dataset, self.dataset_name = self.generate_dataset(n, self.true_param)
                 self.generate_initial_param(variance=variance)
@@ -386,13 +384,20 @@ class Simulation:
                 N_runs_pbar.update(1)
 
             all_param_errors_avg[variance] = param_errors_avg
-            all_matrix_errors_avg[variance] = matrix_errors_avg
+            if self.true_matrix is not None:
+                all_matrix_errors_avg[variance] = matrix_errors_avg
 
         data_pbar.close()
         optimizer_pbar.close()
         N_runs_pbar.close()
 
-        self.plot_all_errors(all_param_errors_avg, all_matrix_errors_avg, N)
+        # Plot errors
+        clear_output(wait=True)  # Clear the cell output, because of tqdm bug widgets after reopen
+        ylabel = r"$\| \theta - \theta^* \|^2$"
+        self.plot_errors(all_param_errors_avg, ylabel, N)
+        if self.true_matrix is not None:
+            ylabel = r"$\| H^{-1} - H^{-1*} \|_F$"
+            self.plot_errors(all_matrix_errors_avg, ylabel, N)
 
     def run_multiple_track_time(self, N: int = 100, n: int = 10_000):
         """
@@ -415,13 +420,15 @@ class Simulation:
         )
         data_pbar = tqdm(total=n, desc="Data", position=2, leave=False)
 
-        for i, variance in enumerate(self.init_variances):
+        for i, variance in enumerate(self.initial_variances):
             # Initialize the error/time dictionaries
             execution_times = {name: [] for name in self.names_list}
             last_param_errors = {name: [] for name in self.names_list}
 
             N_runs_pbar.reset(total=N)
-            N_runs_pbar.set_description(f"{i+1}/{len(self.init_variances)} Runs for e={variance}")
+            N_runs_pbar.set_description(
+                f"{i+1}/{len(self.initial_variances)} Runs for r={variance}"
+            )
 
             for _ in range(N):
                 self.dataset, self.dataset_name = self.generate_dataset(n, self.true_param)
@@ -466,14 +473,18 @@ class Simulation:
 
             ax.set_xscale("log")
             ax.set_yscale("log")
-            ax.set_xlabel("Sample size")
-            ax.set_title(f"e={e}")
+            ax.set_xlabel("Iteration")
+            ax.set_title(f"r={e}")
 
             for idx, (name, errors) in enumerate(errors_dict.items()):
                 # Markers to distinguish the optimizers
                 markevery = (idx / len(errors_dict), 0.2)
+                steps, values = zip(*errors)
+                steps_interp = np.arange(0, steps[-1] + 1, 1)
+                values_interp = np.interp(steps_interp, steps, values)
                 ax.plot(
-                    errors,
+                    steps_interp,
+                    values_interp,
                     label=name,
                     marker=next(markers),
                     ms=12,
@@ -491,20 +502,6 @@ class Simulation:
         )
         plt.tight_layout(pad=3.0)
         plt.show()
-
-    def plot_all_errors(self, all_param_errors: dict, all_matrix_errors: dict, N: int):
-        """
-        Plot the estimation error of paramter and matrix of all optimizers
-        """
-        # Clear the cell output, because of tqdm bug widgets after reopen
-        clear_output(wait=True)
-
-        if self.true_param is not None:
-            ylabel = r"$\| \theta - \theta^* \|^2$"
-            self.plot_errors(all_param_errors, ylabel, N)
-        if self.true_matrix is not None:
-            ylabel = r"$\| H^{-1} - H^{-1*} \|_F$"
-            self.plot_errors(all_matrix_errors, ylabel, N)
 
     @staticmethod
     def highlight_best(data, order: str):
@@ -537,20 +534,20 @@ class Simulation:
         num_subplots = len(all_execution_times) * 2
         fig, axes = plt.subplots(1, num_subplots, figsize=(4 * num_subplots, 6), sharey=False)
 
-        e_values = list(all_execution_times.keys())
+        r_values = list(all_execution_times.keys())
 
         # Initialize lists for legend handles
         handles = []
 
-        for i, e in enumerate(e_values):
+        for i, r in enumerate(r_values):
             ax1 = axes[2 * i]
             ax2 = axes[2 * i + 1]
 
             # Boxplot with seaborn
-            box1 = sns.boxplot(data=all_execution_times[e], ax=ax1)
-            box2 = sns.boxplot(data=all_last_param_error[e], ax=ax2)
+            box1 = sns.boxplot(data=all_execution_times[r], ax=ax1)
+            box2 = sns.boxplot(data=all_last_param_error[r], ax=ax2)
 
-            ax1.set_title(f"e={e}")
+            ax1.set_title(f"r={r}")
             ax1.set_ylabel("time (s)")
             ax1.set_ylim(bottom=0)
             ax1.set_xticklabels([])  # Remove x-axis labels
@@ -560,7 +557,7 @@ class Simulation:
 
             # Collect handles and labels for the legend from the first set of plots
             if i == 0:
-                for patch, label in zip(box1.patches, all_execution_times[e].keys()):
+                for patch, label in zip(box1.patches, all_execution_times[r].keys()):
                     handles.append(mpatches.Patch(color=patch.get_facecolor(), label=label))
 
         # Create a single legend outside the plotting area
