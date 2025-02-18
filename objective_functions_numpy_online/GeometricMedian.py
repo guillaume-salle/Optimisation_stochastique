@@ -108,7 +108,7 @@ class GeometricMedian(BaseObjectiveFunction):
             return grad, hessian_col
 
     def sherman_morrison(
-        self, data: np.ndarray, h: np.ndarray, iter: int
+        self, data: np.ndarray, h: np.ndarray, n_iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the Sherman-Morrison term of the objective function
@@ -125,12 +125,12 @@ class GeometricMedian(BaseObjectiveFunction):
             return np.zeros_like(h), sherman_morrison
         grad = diff / norm
         Z = np.random.randn(d)
-        alpha = 1 / (iter * math.log(iter + 1))
+        alpha = 1 / (n_iter * math.log(n_iter + 1))
         sherman_morrison = (self.grad(X, h + alpha * Z) - grad) * np.sqrt(norm) / alpha
         return sherman_morrison
 
     def grad_and_sherman_morrison(
-        self, data: np.ndarray, h: np.ndarray, iter: int
+        self, data: np.ndarray, h: np.ndarray, n_iter: int
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and Sherman_Morrison term of the objective function
@@ -147,6 +147,6 @@ class GeometricMedian(BaseObjectiveFunction):
             return np.zeros_like(h), sherman_morrison
         grad = diff / norm
         Z = np.random.randn(d)
-        alpha = 1 / (iter * math.log(iter + 1))
+        alpha = 1 / (n_iter * math.log(n_iter + 1))
         sherman_morrison = (self.grad(X, h + alpha * Z) - grad) * np.sqrt(norm) / alpha
         return grad, sherman_morrison

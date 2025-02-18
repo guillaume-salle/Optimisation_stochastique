@@ -21,7 +21,9 @@ class BaseOptimizer(ABC):
     def __init__(
         self,
         param: np.ndarray,
-        objective_function: BaseObjectiveFunction,
+        obj_function: BaseObjectiveFunction,
+        batch_size: int = None,
+        batch_size_power: int = 0,
         averaged: bool = False,
         log_weight: float = 0.0,
     ) -> None:
@@ -35,7 +37,13 @@ class BaseOptimizer(ABC):
             weight_exp (float): Exponent for the logarithmic weight.
         """
         self.param = param
-        self.objective_function = objective_function
+        self.obj_function = obj_function
+        self.batch_size_power = batch_size_power
+        if batch_size is not None:
+            self.batch_size = batch_size
+            self.batch_size_power = np.log(batch_size) / np.log(param.shape[0])
+        else:
+            self.batch_size = param.shape[0] ** batch_size_power
 
         self.averaged = averaged
         # Copy the initial parameter if averaged, otherwise use the same

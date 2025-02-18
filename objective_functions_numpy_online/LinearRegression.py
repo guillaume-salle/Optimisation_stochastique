@@ -108,7 +108,7 @@ class LinearRegression(BaseObjectiveFunction):
         return grad, hessian_col
 
     def sherman_morrison(
-        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, n_iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute and the Sherman-Morrison term of the linear regression loss, works only for a single data point
@@ -121,7 +121,7 @@ class LinearRegression(BaseObjectiveFunction):
         return sherman_morrison
 
     def grad_and_sherman_morrison(
-        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, iter: int = None
+        self, data: Tuple[np.ndarray, np.ndarray], theta: np.ndarray, n_iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Sherman-Morrison term of the linear regression loss, works only for a single data point

@@ -1,5 +1,4 @@
 import numpy as np
-import math
 from typing import Tuple
 
 from algorithms_numpy import BaseOptimizer
@@ -15,11 +14,18 @@ class SNA(BaseOptimizer):
 
     Parameters:
     param (np.ndarray): Initial parameters for the optimizer.
+    obj_function (BaseObjectiveFunction): Objective function to optimize.
+    batch_size (int): Size of the batch.
+    batch_size_power (int): batch size as a power of the dimension of the parameter to optimize.
     lr_exp (float): Exponent for learning rate decay.
     lr_const (float): Constant multiplier for learning rate.
     lr_add_iter (int): Additional iterations for learning rate calculation.
+    identity_weight (int): Weight for the initial identity matrix.
     averaged (bool): Whether to use an averaged parameter.
-    weight_exp (float): Exponent for the logarithmic weight.
+    log_weight(float): Exponent for the logarithmic weight.
+    compute_hessian_param_avg (bool): If averaged, where to compute the hessian.
+    compute_inverse (bool): Actually compute the inverse, or just solve the system.
+    sherman_morrison (bool): Whether to use the Sherman-Morrison formula.
     """
 
     DEFAULT_LR_EXP = 0.67  # for non-averaged
@@ -27,16 +33,18 @@ class SNA(BaseOptimizer):
     def __init__(
         self,
         param: np.ndarray,
-        objective_function: BaseObjectiveFunction,
-        lr_exp: float = None,  # Not specified in the article for WASNA, and set to 1.0 for SNA
+        obj_function: BaseObjectiveFunction,
+        batch_size: int = None,
+        batch_size_power: int = 0,
+        lr_exp: float = None,
         lr_const: float = 1.0,
         lr_add_iter: int = 0,
-        identity_weight: int = 400,  # Weight more the initial identity matrix
-        averaged: bool = False,  # Whether to use an averaged parameter
-        log_weight: float = 2.0,  # Exponent for the logarithmic weight
-        compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
-        compute_inverse: bool = False,  # Actually compute inverse, or just solve the system
-        sherman_morrison: bool = True,  # Whether to use the Sherman-Morrison formula
+        identity_weight: int = 400,
+        averaged: bool = False,
+        log_weight: float = 2.0,
+        compute_hessian_param_avg: bool = False,
+        compute_inverse: bool = False,
+        sherman_morrison: bool = True,
     ):
         if lr_exp is None:
             lr_exp = 1.0 if not averaged else self.DEFAULT_LR_EXP
@@ -56,16 +64,23 @@ class SNA(BaseOptimizer):
         self.compute_inverse = compute_inverse
         self.sherman_morrison = sherman_morrison
 
-        if sherman_morrison and hasattr(objective_function, "sherman_morrison"):
+        if sherman_morrison and hasattr(obj_function, "sherman_morrison"):
+            self.name += " SM"
             self.step = self.step_sherman_morrison
             self.hessian_inv = np.eye(param.shape[0])
-            self.name += " S-M"
         else:
             self.hessian_bar = np.eye(param.shape[0])
             if compute_inverse:
                 self.hessian_inv = np.eye(param.shape[0])
 
-        super().__init__(param, objective_function, averaged, log_weight)
+        super().__init__(
+            param=param,
+            obj_function=obj_function,
+            batch_size=batch_size,
+            batch_size_power=batch_size_power,
+            averaged=averaged,
+            log_weight=log_weight,
+        )
 
     def step(
         self,
@@ -80,14 +95,14 @@ class SNA(BaseOptimizer):
         self.n_iter += 1
         # Compute the gradient and Hessian of the objective function
         if self.compute_hessian_param_avg:  # cf article
-            grad = self.objective_function.grad(data, self.param_not_averaged)
-            hessian = self.objective_function.hessian(data, self.param)
+            grad = self.obj_function.grad(data, self.param_not_averaged)
+            hessian = self.obj_function.hessian(data, self.param)
         else:  # faster, allow to re-use the grad from hessian computation
-            grad, hessian = self.objective_function.grad_and_hessian(data, self.param_not_averaged)
+            grad, hessian = self.obj_function.grad_and_hessian(data, self.param_not_averaged)
 
         # Update the running average of the Hessian
         n_matrix = self.n_iter + self.identity_weight
-        self.hessian_bar = ((n_matrix - 1) / n_matrix) * self.hessian_bar + hessian / n_matrix
+        self.hessian_bar += (hessian - self.hessian_bar) / n_matrix
 
         # Update the non averaged parameter
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
@@ -112,18 +127,22 @@ class SNA(BaseOptimizer):
         """
         self.n_iter += 1
         if self.compute_hessian_param_avg:  # cf article
-            grad = self.objective_function.grad(data, self.param_not_averaged)
-            sherman_morrison = self.objective_function.sherman_morrison(data, self.param)
+            grad = self.obj_function.grad(data, self.param_not_averaged)
+            # n_iter + lr_add_iter ??
+            sherman_morrison = self.obj_function.sherman_morrison(data, self.param, self.n_iter)
         else:  # faster, allow to re-use the grad from hessian computation
-            grad, sherman_morrison = self.objective_function.grad_and_sherman_morrison(
+            grad, sherman_morrison = self.obj_function.grad_and_sherman_morrison(
                 data, self.param_not_averaged, self.n_iter  # n_iter + lr_add_iter ??
             )
 
         # Update the inverse Hessian matrix using the Sherman-Morrison equation
         n_matrix = self.n_iter + self.identity_weight
-        product = np.dot(self.hessian_inv, sherman_morrison) / n_matrix
-        self.hessian_inv -= (1 / n_matrix) * self.hessian_inv + np.outer(
-            product, product / (n_matrix ** (-1) + np.dot(sherman_morrison, product))
+        product = np.dot(self.hessian_inv, sherman_morrison)
+        self.hessian_inv += (1 / (n_matrix - 1)) * (
+            self.hessian_inv
+            - n_matrix
+            / (n_matrix - 1 + np.dot(sherman_morrison, product))
+            * np.outer(product, product)
         )
 
         # Update the non averaged parameter

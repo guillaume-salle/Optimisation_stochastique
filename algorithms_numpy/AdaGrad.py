@@ -1,15 +1,13 @@
 import numpy as np
-import math
-from typing import Tuple, Dict, Any
+from typing import Tuple
 
 from algorithms_numpy import BaseOptimizer
 from objective_functions_numpy_online import BaseObjectiveFunction
 
 
-class SGD(BaseOptimizer):
+class AdaGrad(BaseOptimizer):
     """
-    Stochastic Gradient Descent optimizer
-    Uses a learning rate lr = lr_const * (n_iter + lr_add_iter)^(-lr_exp) for optimization.
+    Adagrad optimizer. Uses a learning rate lr = lr_const * (n_iter + lr_add_iter)^(-lr_exp) for optimization.
     Averaged parameter can be calculated with a logarithmic weight, i.e. the weight is
     calculated as log(n_iter+1)^weight_exp.
 
@@ -22,10 +20,11 @@ class SGD(BaseOptimizer):
     lr_const (float): Constant multiplier for learning rate.
     lr_add_iter (int): Additional iterations for learning rate calculation.
     averaged (bool): Whether to use an averaged parameter.
-    weight_exp (float): Exponent for the logarithmic weight.
+    log_exp (float): Exponent for the logarithmic weight.
+    epsilon (float): Small constant to avoid singularity problems.
     """
 
-    DEFAULT_LR_EXP = 0.67  # Do not use 1 for averaged algorithms, nor for SGD since we dont know the minimal constant
+    DEFAULT_LR_EXP = 0.67  # Default value for the learning rate exponent
 
     def __init__(
         self,
@@ -38,18 +37,23 @@ class SGD(BaseOptimizer):
         lr_add_iter: int = 0,
         averaged: bool = False,
         log_weight: float = 2.0,
+        epsilon: float = 1e-8,
     ):
         # Name for plotting
         self.name = (
             ("W" if averaged and log_weight != 0.0 else "")
             + ("A" if averaged else "")
-            + "SGD"
+            + "Ada"
             + (f" α={lr_exp}")
             + (f" c_α={lr_const}" if lr_const != 1.0 else "")
         )
         self.lr_exp = lr_exp
         self.lr_const = lr_const
         self.lr_add_iter = lr_add_iter
+        self.epsilon = epsilon
+
+        # Initialize the sum of the gradients
+        self.sum_grad_sq = np.ones_like(param)
 
         super().__init__(
             param=param,
@@ -73,9 +77,12 @@ class SGD(BaseOptimizer):
         self.n_iter += 1
         grad = self.obj_function.grad(data, self.param_not_averaged)
 
-        # Update the non averaged parameter
-        learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
-        self.param_not_averaged -= learning_rate * grad
+        # Update the sum of the gradients
+        self.sum_grad_sq += grad**2
+
+        # Update the non averaged parameter, add the division of sum_grad_sq by n_iter here, hence the +0.5
+        learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp + 0.5)
+        self.param_not_averaged -= learning_rate * grad / (np.sqrt(self.sum_grad_sq) + self.epsilon)
 
         if self.averaged:
             self.update_averaged_param()

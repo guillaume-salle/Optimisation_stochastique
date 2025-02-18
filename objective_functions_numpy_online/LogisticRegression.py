@@ -159,7 +159,7 @@ class LogisticRegression(BaseObjectiveFunction):
         return grad, hessian_col
 
     def sherman_morrison(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int = None
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, n_iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Sherman-Morrison term of the logistic loss, works only for a single data point
@@ -176,7 +176,7 @@ class LogisticRegression(BaseObjectiveFunction):
         return sherman_morrison
 
     def grad_and_sherman_morrison(
-        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int = None
+        self, data: Tuple[np.ndarray, np.ndarray], h: np.ndarray, n_iter: int = None
     ) -> Tuple[np.ndarray, np.ndarray]:
         """
         Compute the gradient and the Sherman-Morrison term of the logistic loss, works only for a single data point

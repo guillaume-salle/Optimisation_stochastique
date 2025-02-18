@@ -48,11 +48,11 @@ class BaseObjectiveFunction(ABC):
 
     # Methods to be implemented if random hessians are rank 1
     # def sherman_morrison(
-    #     self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, iter: int
+    #     self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, n_iter: int
     # ) -> Tuple[np.ndarray, np.ndarray]:
     #     raise NotImplementedError("sherman_morrison is not implemented for this objective function")
 
     # def grad_and_sherman_morrison(
-    #     self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray
+    #     self, data: np.ndarray | Tuple[np.ndarray, np.ndarray], h: np.ndarray, n_iter: int
     # ) -> Tuple[np.ndarray, np.ndarray]:
     #     raise NotImplementedError("sherman_morrison is not implemented for this objective function")

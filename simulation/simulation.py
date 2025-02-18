@@ -31,10 +31,8 @@ class Simulation:
 
     def __init__(
         self,
-        objective_function: BaseObjectiveFunction,  # Not instantiated yet
+        obj_function: BaseObjectiveFunction,  # Not instantiated yet
         optimizer_list: List[partial[BaseOptimizer]],
-        batch_size_power: float | int = None,  # power of d
-        batch_size_power_list: list[float | int] = None,  # for comparing different batch sizes
         generate_dataset: Callable = None,  # generate a dataset with a true_param
         dataset: MyDataset = None,
         test_dataset: MyDataset = None,  # for accuracy evaluation
@@ -56,10 +54,8 @@ class Simulation:
 
         self.true_param = true_param
         self.true_matrix = true_matrix
-        self.objective_function = objective_function
+        self.obj_function = obj_function
         self.optimizer_list = optimizer_list
-        self.batch_size_power = batch_size_power
-        self.batch_size_power_list = batch_size_power_list
         self.generate_dataset = generate_dataset
         self.dataset = dataset
         self.test_dataset = test_dataset
@@ -77,7 +73,7 @@ class Simulation:
             self.device = torch.device(device)
             if device is None:
                 self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.objective_function.to(self.device)
+            self.obj_function.to(self.device)
             if self.true_param is not None:
                 self.true_param = torch.as_tensor(self.true_param, device=self.device)
             if self.true_matrix is not None:
@@ -94,9 +90,7 @@ class Simulation:
         raw_list = []
         names_list = []
         for optimizer_class in self.optimizer_list:
-            optimizer = optimizer_class(
-                objective_function=self.objective_function, param=np.zeros(1)
-            )
+            optimizer = optimizer_class(obj_function=self.obj_function, param=np.zeros(1))
             if optimizer.name in raw_list:
                 count = raw_list.count(optimizer.name)
                 name = f"{optimizer.name} ({count})"
@@ -113,7 +107,7 @@ class Simulation:
         # Get the dimension of the parameter from the dataset
         if self.dataset is None:
             raise ValueError("dataset is not set")
-        param_dim = self.objective_function.get_param_dim(data=next(iter(self.dataset)))
+        param_dim = self.obj_function.get_param_dim(data=next(iter(self.dataset)))
 
         # Check if the true parameter has the same dimension
         if self.true_param is not None and self.true_param.shape[0] != param_dim:
@@ -134,6 +128,7 @@ class Simulation:
         param_errors: dict[str, list],
         matrix_errors: dict[str, list],
         optimizer: BaseOptimizer,
+        n: int,
     ):
         """
         Log the estimation error of the parameter and matrix with either numpy or torch tensors
@@ -150,7 +145,7 @@ class Simulation:
                 matrix_error = np.linalg.norm(diff, ord="fro")
             else:
                 matrix_error = torch.norm(diff, p="fro").item()
-            matrix_errors[optimizer.name].append(matrix_error)
+            matrix_errors[optimizer.name].append((n, matrix_error))
 
     def run_track_errors(
         self,
@@ -164,10 +159,6 @@ class Simulation:
         Returns:
             Tuple[dict, dict]: Dictionaries of estimation errors for parameter and matrix for all optimizers
         """
-        if self.batch_size_power is None:
-            raise ValueError("batch_size_power is not set")
-        batch_size = int(len(self.initial_param) ** self.batch_size_power)
-
         # Initialize the directories for errors, if true values are provided
         if self.true_param is None:
             raise ValueError("true_param is not set")
@@ -194,25 +185,26 @@ class Simulation:
                 self.param = self.initial_param.clone().to(self.device)
             else:
                 self.param = self.initial_param.copy()
-            optimizer = optimizer_class(
-                objective_function=self.objective_function, param=self.param
-            )
+            optimizer = optimizer_class(obj_function=self.obj_function, param=self.param)
             optimizer.name = self.names_list[i]  # for duplicate names
             optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
+            batch_size = optimizer.batch_size
             if self.use_torch:
                 data_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
             else:
                 data_loader = self.dataset.batch_iter(batch_size)
 
             # Log initial error
-            self.logging_estimation_error(param_errors, matrix_errors, optimizer)
+            n = 0
+            self.logging_estimation_error(param_errors, matrix_errors, optimizer, n)
 
             # Run the optimizer on the dataset
             for data in data_loader:
                 optimizer.step(data)
-                self.logging_estimation_error(param_errors, matrix_errors, optimizer)
+                n += batch_size
+                self.logging_estimation_error(param_errors, matrix_errors, optimizer, n)
                 data_pbar.update(batch_size)
 
             optimizer_pbar.update(1)
@@ -237,10 +229,6 @@ class Simulation:
             Tuple[dict, dict]: Dictionaries of execution times and last paramter error
                 for all optimizers
         """
-        if self.batch_size_power is None:
-            raise ValueError("batch_size_power is not set")
-        batch_size = int(len(self.initial_param) ** self.batch_size_power)
-
         # Determine the metric to evaluate,
         if self.true_param is not None:
             metrics = "last parameter error"
@@ -270,13 +258,12 @@ class Simulation:
                 self.param = self.initial_param.clone().to(self.device)
             else:
                 self.param = self.initial_param.copy()
-            optimizer = optimizer_class(
-                objective_function=self.objective_function, param=self.param
-            )
+            optimizer = optimizer_class(obj_function=self.obj_function, param=self.param)
             optimizer.name = self.names_list[i]  # for duplicate names
             optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
+            batch_size = optimizer.batch_size
             if self.use_torch:
                 data_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
             else:
@@ -297,8 +284,8 @@ class Simulation:
                     self.param - self.true_param, self.param - self.true_param
                 )
             elif metrics == "accuracies":
-                train_acc = self.objective_function.evaluate_accuracy(self.dataset, self.param)
-                test_acc = self.objective_function.evaluate_accuracy(self.test_dataset, self.param)
+                train_acc = self.obj_function.evaluate_accuracy(self.dataset, self.param)
+                test_acc = self.obj_function.evaluate_accuracy(self.test_dataset, self.param)
                 metrics_dict[optimizer.name] = {
                     "Training Accuracy": train_acc,
                     "Test Accuracy": test_acc,
@@ -410,18 +397,14 @@ class Simulation:
     def run_multiple_track_time(self, N: int = 100, n: int = 10_000):
         """
         Run the experiment multiple times by generating a new dataset and initial parameter each time.
-        Track the execution times and last paramter errors for all optimizers, with batch sizes determined by batch_size_power_list.
-        Plot the execution times and errors for all optimizers in separate subplots with batch size on the x-axis.
-        If there is only one batch size, the results are stored in lists to make boxplots.
+        Track the execution times and last parameter errors for all optimizers.
+        The results are stored in lists to make boxplots.
         Args:
             N (int): Number of simulations
             n (int): Number of samples in the dataset
         Returns:
             Tuple[dict, dict]:
         """
-        if self.batch_size_power_list is None:
-            raise ValueError("batch_size_power_list must be set")
-
         # Initialize error dictionaries to hold results for each e value
         all_execution_times = {}
         all_metrics = {}
@@ -434,14 +417,8 @@ class Simulation:
 
         for i, variance in enumerate(self.init_variances):
             # Initialize the error/time dictionaries
-            if len(self.batch_size_power_list) == 1:
-                # If only one batch_size, store the results in lists to make boxplots
-                execution_times = {name: [] for name in self.names_list}
-                last_param_errors = {name: [] for name in self.names_list}
-            else:
-                # If multiple batch sizes, store the results in dictionaries to average over runs
-                execution_times = {name: 0.0 for name in self.names_list}
-                last_param_errors = {name: 0.0 for name in self.names_list}
+            execution_times = {name: [] for name in self.names_list}
+            last_param_errors = {name: [] for name in self.names_list}
 
             N_runs_pbar.reset(total=N)
             N_runs_pbar.set_description(f"{i+1}/{len(self.init_variances)} Runs for e={variance}")
@@ -450,22 +427,13 @@ class Simulation:
                 self.dataset, self.dataset_name = self.generate_dataset(n, self.true_param)
                 self.generate_initial_param(variance=variance)
 
-                for batch_size_power in self.batch_size_power_list:
-                    self.batch_size = len(self.true_param) ** batch_size_power
-                    times_run, errors_run = self.run_track_time(pbars=[optimizer_pbar, data_pbar])
+                times_run, errors_run = self.run_track_time(pbars=[optimizer_pbar, data_pbar])
 
-                    if len(self.batch_size_power_list) == 1:
-                        # Store the times and errors for each run
-                        for name, time in times_run.items():
-                            execution_times[name].append(time)
-                        for name, error in errors_run.items():
-                            last_param_errors[name].append(error)
-                    else:
-                        # Average the times and errors over the runs
-                        for name, time in times_run.items():
-                            execution_times[name][batch_size_power] += time / N
-                        for name, error in errors_run.items():
-                            last_param_errors[name][batch_size_power] += error / N
+                # Store the times and errors for each run
+                for name, time in times_run.items():
+                    execution_times[name].append(time)
+                for name, error in errors_run.items():
+                    last_param_errors[name].append(error)
 
                 N_runs_pbar.update(1)
 
@@ -476,11 +444,7 @@ class Simulation:
         optimizer_pbar.close()
         N_runs_pbar.close()
 
-        if len(self.batch_size_power_list) == 1:
-            self.batch_size_power = self.batch_size_power_list[0]
-            self.boxplot_time_and_errors(all_execution_times, all_metrics, N)
-        else:
-            self.plot_time_and_errors(all_execution_times, all_metrics, N)
+        self.boxplot_time_and_errors(all_execution_times, all_metrics, N)
 
     def plot_errors(self, all_errors_avg: dict, ylabel: str, N: int):
         """
@@ -506,15 +470,9 @@ class Simulation:
             ax.set_title(f"e={e}")
 
             for idx, (name, errors) in enumerate(errors_dict.items()):
-                # Multiply the x-axis values by batch_size
-                batch_size = int(len(self.param) ** self.batch_size_power_list[0])
-                # plot the first error in the graph (shift by 1 the x-axis)
-                x_values = np.arange(1, len(errors) * batch_size + 1, batch_size)
-
                 # Markers to distinguish the optimizers
                 markevery = (idx / len(errors_dict), 0.2)
                 ax.plot(
-                    x_values,
                     errors,
                     label=name,
                     marker=next(markers),
@@ -529,8 +487,7 @@ class Simulation:
         fig.text(0.0, 0.5, ylabel, va="center", rotation="vertical")
 
         plt.suptitle(
-            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, "
-            + f"batch size power={self.batch_size_power}"
+            f"{self.obj_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}"
         )
         plt.tight_layout(pad=3.0)
         plt.show()
@@ -610,39 +567,7 @@ class Simulation:
         fig.legend(handles=handles, loc="center left", bbox_to_anchor=(1.0, 0.5), ncol=1)
 
         plt.suptitle(
-            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, "
-            + f"batch size power={self.batch_size_power}"
+            f"{self.obj_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}"
         )
         plt.tight_layout(rect=[0, 0, 1, 1])  # Adjust layout to make room for the legend
-        plt.show()
-
-    def plot_time_and_errors(self, all_execution_times: dict, all_last_param_errors: dict, N: int):
-        """ """
-        num_e_values = len(self.init_variances)
-        fig, axes = plt.subplots(num_e_values, 2, figsize=(20, 6 * num_e_values), sharey=False)
-
-        for i in range(num_e_values):
-            e = self.init_variances[i]
-            ax1, ax2 = axes[i]
-
-            # Plot errors
-            for name, errors in all_last_param_errors[e].items():
-                ax1.plot(self.batch_size_power_list, errors, label=name, marker="o")
-            ax1.set_ylabel(ylabel=r"$\| \theta - \theta^* \|^2$")
-            ax1.set_ylim(bottom=0)
-
-            # Plot execution times
-            for name, errors in all_execution_times[e].items():
-                ax2.plot(self.batch_size_power_list, errors, label=name, marker="o")
-            ax2.set_ylabel("time (s)")
-            ax2.set_ylim(bottom=0)
-
-            ax1.set_title(f"e={e}")
-
-        plt.suptitle(
-            f"{self.objective_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}, "
-            + f"batch size power={self.batch_size_power}"
-        )
-        # plt.tight_layout(pad=3.0)
-        plt.tight_layout()
         plt.show()
