@@ -24,6 +24,7 @@ class AdaGrad(BaseOptimizer):
     epsilon (float): Small constant to avoid singularity problems.
     """
 
+    name = "Ada"
     DEFAULT_LR_EXP = 0.67  # Default value for the learning rate exponent
 
     def __init__(
@@ -38,18 +39,9 @@ class AdaGrad(BaseOptimizer):
         averaged: bool = False,
         log_weight: float = 2.0,
         epsilon: float = 1e-8,
+        multiply_lr_const: bool = False,
+        multiply_exp: float = None,
     ):
-        # Name for plotting
-        self.name = (
-            ("W" if averaged and log_weight != 0.0 else "")
-            + ("A" if averaged else "")
-            + "Ada"
-            + (f" α={lr_exp}")
-            + (f" c_α={lr_const}" if lr_const != 1.0 else "")
-        )
-        self.lr_exp = lr_exp
-        self.lr_const = lr_const
-        self.lr_add_iter = lr_add_iter
         self.epsilon = epsilon
 
         # Initialize the sum of the gradients
@@ -60,8 +52,13 @@ class AdaGrad(BaseOptimizer):
             obj_function=obj_function,
             batch_size=batch_size,
             batch_size_power=batch_size_power,
+            lr_exp=lr_exp,
+            lr_const=lr_const,
+            lr_add_iter=lr_add_iter,
             averaged=averaged,
             log_weight=log_weight,
+            multiply_lr_const=multiply_lr_const,
+            multiply_exp=multiply_exp,
         )
 
     def step(

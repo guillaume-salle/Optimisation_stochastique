@@ -45,20 +45,12 @@ class SNA(BaseOptimizer):
         compute_hessian_param_avg: bool = False,
         compute_inverse: bool = False,
         sherman_morrison: bool = True,
+        multiply_lr_const: bool = False,
+        multiply_exp: float = None,
     ):
         if lr_exp is None:
             lr_exp = 1.0 if not averaged else self.DEFAULT_LR_EXP
-        self.name = (
-            ("W" if averaged and log_weight != 0.0 else "")
-            + ("A" if averaged else "")
-            + "SNA"
-            + (f" α={lr_exp}")
-            + (f" τ_theta={log_weight}" if log_weight != 2.0 and log_weight != 0.0 else "")
-            + (" AP" if compute_hessian_param_avg else "")  # AP = Averaged Parameter
-        )
-        self.lr_exp = lr_exp
-        self.lr_const = lr_const
-        self.lr_add_iter = lr_add_iter
+        self.name = "SNA" + (" AP" if compute_hessian_param_avg else "")  # AP = Averaged Parameter
         self.identity_weight = identity_weight
         self.compute_hessian_param_avg = compute_hessian_param_avg
         self.compute_inverse = compute_inverse
@@ -69,8 +61,13 @@ class SNA(BaseOptimizer):
             obj_function=obj_function,
             batch_size=batch_size,
             batch_size_power=batch_size_power,
+            lr_exp=lr_exp,
+            lr_const=lr_const,
+            lr_add_iter=lr_add_iter,
             averaged=averaged,
             log_weight=log_weight,
+            multiply_lr_const=multiply_lr_const,
+            multiply_exp=multiply_exp,
         )
 
         # For batch_size=1 we can use Sherman-Morrison formula if available

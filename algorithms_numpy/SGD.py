@@ -1,5 +1,4 @@
 import numpy as np
-import math
 from typing import Tuple, Dict, Any
 
 from algorithms_numpy import BaseOptimizer
@@ -26,6 +25,7 @@ class SGD(BaseOptimizer):
     """
 
     DEFAULT_LR_EXP = 0.67  # Do not use 1 for averaged algorithms, nor for SGD since we dont know the minimal constant
+    name = "SGD"
 
     def __init__(
         self,
@@ -38,26 +38,38 @@ class SGD(BaseOptimizer):
         lr_add_iter: int = 0,
         averaged: bool = False,
         log_weight: float = 2.0,
+        multiply_lr_const: bool = False,
+        multiply_exp: float = None,
     ):
-        # Name for plotting
-        self.name = (
-            ("W" if averaged and log_weight != 0.0 else "")
-            + ("A" if averaged else "")
-            + "SGD"
-            + (f" α={lr_exp}")
-            + (f" c_α={lr_const}" if lr_const != 1.0 else "")
-        )
-        self.lr_exp = lr_exp
-        self.lr_const = lr_const
-        self.lr_add_iter = lr_add_iter
+        # if multiply is None:
+        #     multiply = True if batch_size > 1 else False
+        # if multiply:
+        #     lr_const *= np.sqrt(param.shape[0])
+        # # Name for plotting
+        # self.name = (
+        #     ("W" if averaged and log_weight != 0.0 else "")
+        #     + ("A" if averaged else "")
+        #     + "SGD"
+        #     + (f" α={lr_exp}")
+        #     + (f" c_α={lr_const}" if lr_const != 1.0 else "")
+        #     + (f" m" if multiply else "")
+        # )
+        # self.lr_exp = lr_exp
+        # self.lr_const = lr_const
+        # self.lr_add_iter = lr_add_iter
 
         super().__init__(
             param=param,
             obj_function=obj_function,
             batch_size=batch_size,
             batch_size_power=batch_size_power,
+            lr_exp=lr_exp,
+            lr_const=lr_const,
+            lr_add_iter=lr_add_iter,
             averaged=averaged,
             log_weight=log_weight,
+            multiply_lr_const=multiply_lr_const,
+            multiply_exp=multiply_exp,
         )
 
     def step(

@@ -27,6 +27,8 @@ class USNA(BaseOptimizer):
         lr_hess_add_iter: int = 400,  # Not specified, Works better
         averaged: bool = False,  # Whether to use an averaged parameter
         log_weight: float = 2.0,  # Exponent for the logarithmic weight
+        multiply_lr_const: bool = False,  # Whether to multiply the step size by the dimension
+        multiply_exp: float = None,  # Exponent for the dimension multiplier
         averaged_matrix: bool = False,  # Wether to use an averaged estimate of the inverse hessian
         log_weight_matrix: float = 2.0,  # Exponent for the logarithmic weight of the averaged inverse hessian
         compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
@@ -36,20 +38,13 @@ class USNA(BaseOptimizer):
             lr_exp = 1.0 if not averaged else self.DEFAULT_LR_EXP
 
         self.name = (
-            "U"
-            + ("W" if averaged and log_weight != 0.0 else "")
-            + ("A" if averaged else "")
-            + "SNA"
+            "USNA"
             + (" AM" if averaged_matrix else "")
             + (" AP" if compute_hessian_param_avg else "")
             + (" P" if proj else "")
-            + (f" α={lr_exp}")
-            + (f" c_α={lr_const}" if lr_const != 1.0 else "")
             + (f" γ={lr_hess_exp}" if lr_hess_exp != 0.75 else "")
+            + (f" c_γ={lr_hess_const}" if lr_hess_const != 0.1 else "")
         )
-        self.lr_exp = lr_exp
-        self.lr_const = lr_const
-        self.lr_add_iter = lr_add_iter
         self.lr_hess_exp = lr_hess_exp
         self.lr_hess_const = lr_hess_const
         self.lr_hess_add_iter = lr_hess_add_iter
@@ -69,8 +64,13 @@ class USNA(BaseOptimizer):
             obj_function=obj_function,
             batch_size=batch_size,
             batch_size_power=batch_size_power,
+            lr_exp=lr_exp,
+            lr_const=lr_const,
+            lr_add_iter=lr_add_iter,
             averaged=averaged,
             log_weight=log_weight,
+            multiply_lr_const=multiply_lr_const,
+            multiply_exp=multiply_exp,
         )
 
     def step(

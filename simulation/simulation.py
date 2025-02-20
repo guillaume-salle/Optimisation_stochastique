@@ -29,6 +29,8 @@ class Simulation:
     on a given objective function, with computable gradient and hessian.
     """
 
+    REFRESH_OUTPUT = False
+
     def __init__(
         self,
         obj_function: BaseObjectiveFunction,  # Not instantiated yet
@@ -392,7 +394,9 @@ class Simulation:
         N_runs_pbar.close()
 
         # Plot errors
-        clear_output(wait=True)  # Clear the cell output, because of tqdm bug widgets after reopen
+        if self.REFRESH_OUTPUT:
+            # Clear the cell output, because of tqdm bug widgets after reopen
+            clear_output(wait=True)
         ylabel = r"$\| \theta - \theta^* \|^2$"
         self.plot_errors(all_param_errors_avg, ylabel, N)
         if self.true_matrix is not None:
@@ -528,8 +532,9 @@ class Simulation:
         """
         Make boxplots of the execution times and last parameter errors of all optimizers using seaborn
         """
-        # Clear the cell output, because of tqdm bug widgets after reopen
-        clear_output(wait=True)
+        if self.REFRESH_OUTPUT:
+            # Clear the cell output, because of tqdm bug widgets after reopen
+            clear_output(wait=True)
 
         num_subplots = len(all_execution_times) * 2
         fig, axes = plt.subplots(1, num_subplots, figsize=(4 * num_subplots, 6), sharey=False)
