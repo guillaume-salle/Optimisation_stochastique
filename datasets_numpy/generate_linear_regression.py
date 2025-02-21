@@ -17,7 +17,11 @@ def generate_linear_regression(
     covariance_matrix = np.zeros((d, d))
     for i in range(d):
         for j in range(d):
-            covariance_matrix[i, j] = CONST_TOEPLITZ ** abs(i - j)
+            if i != j:
+                covariance_matrix[i, j] = CONST_TOEPLITZ ** abs(i - j)
+            else:
+                covariance_matrix[i, j] = 1 + i
+                # covariance_matrix[i, j] = 1
 
     X = np.random.multivariate_normal(mean=np.zeros(d), cov=covariance_matrix, size=n)
     if bias:

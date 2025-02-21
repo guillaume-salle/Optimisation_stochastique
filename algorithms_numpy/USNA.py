@@ -10,7 +10,6 @@ class USNA(BaseOptimizer):
     Universal Stochastic Newton Algorithm optimizer, version described in the internship report.
     """
 
-    DEFAULT_LR_EXP = 0.67  # for non-averaged
     CONST_BETA = 1 / 2  # beta_n = CONST_BETA / gamma_n
 
     def __init__(
@@ -34,9 +33,6 @@ class USNA(BaseOptimizer):
         compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
         proj: bool = False,
     ):
-        if lr_exp is None:
-            lr_exp = 1.0 if not averaged else self.DEFAULT_LR_EXP
-
         self.name = (
             "USNA"
             + (" AM" if averaged_matrix else "")
@@ -91,8 +87,9 @@ class USNA(BaseOptimizer):
             self.update_averaged_matrix()
 
         # Update theta
-        learning_rate_theta = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
-        self.param_not_averaged -= learning_rate_theta * self.matrix @ grad
+        learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
+        # learning_rate = min(learning_rate, 1.0) # TODO decide if we want to clip the learning rate
+        self.param_not_averaged -= learning_rate * self.matrix @ grad
 
         if self.averaged:
             self.update_averaged_param()

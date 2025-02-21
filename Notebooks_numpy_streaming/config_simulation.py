@@ -24,18 +24,22 @@ from datasets_numpy import (
 # Configuration for the number of runs and size of data
 N = 20
 n = int(1e4)
+dim = 50
 
 # Configuration for true parameter
 # Value from the article:
-true_param = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
+# true_param = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
 # true_param = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0])  # Slides, bias=False
 # true_param = torch.tensor([1, 1, 1, 1, 1])  # Poly, bias=False
+# generate a random true parameter of dimension dim
+true_param = np.random.randn(dim)
 
 # Whether or not a bias term is included
 
 alpha_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 gamma_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
-r_values = [1, 5]
+# r_values = [1, 5]
+r_values = [1, 15]
 
 # Linear regression
 bias_setting = True
@@ -82,9 +86,8 @@ simulation_spherical_distribution = partial(
 
 
 # p-means
-d = 40
 p = 1.5
-true_param_p_means = np.zeros(d)
+true_param_p_means = np.zeros(dim)
 simulation_p_means = partial(
     Simulation,
     obj_function=pMeans(p=p),

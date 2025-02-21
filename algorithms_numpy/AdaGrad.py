@@ -25,22 +25,21 @@ class AdaGrad(BaseOptimizer):
     """
 
     name = "Ada"
-    DEFAULT_LR_EXP = 0.67  # Default value for the learning rate exponent
 
     def __init__(
         self,
         param: np.ndarray,
         obj_function: BaseObjectiveFunction,
         batch_size: int = None,
-        batch_size_power: int = 0,
-        lr_exp: float = DEFAULT_LR_EXP,
-        lr_const: float = 1.0,
-        lr_add_iter: int = 0,
-        averaged: bool = False,
-        log_weight: float = 2.0,
-        epsilon: float = 1e-8,
+        batch_size_power: int = None,
+        lr_exp: float = None,
+        lr_const: float = None,
+        lr_add_iter: int = None,
+        averaged: bool = None,
+        log_weight: float = None,
         multiply_lr_const: bool = False,
         multiply_exp: float = None,
+        epsilon: float = 1e-8,
     ):
         self.epsilon = epsilon
 
@@ -79,6 +78,7 @@ class AdaGrad(BaseOptimizer):
 
         # Update the non averaged parameter, add the division of sum_grad_sq by n_iter here, hence the +0.5
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp + 0.5)
+        # learning_rate = min(learning_rate, 1.0) # TODO decide if we want to clip the learning rate
         self.param_not_averaged -= learning_rate * grad / (np.sqrt(self.sum_grad_sq) + self.epsilon)
 
         if self.averaged:

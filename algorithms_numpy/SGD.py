@@ -24,7 +24,6 @@ class SGD(BaseOptimizer):
     weight_exp (float): Exponent for the logarithmic weight.
     """
 
-    DEFAULT_LR_EXP = 0.67  # Do not use 1 for averaged algorithms, nor for SGD since we dont know the minimal constant
     name = "SGD"
 
     def __init__(
@@ -33,7 +32,7 @@ class SGD(BaseOptimizer):
         obj_function: BaseObjectiveFunction,
         batch_size: int = None,
         batch_size_power: int = 0,
-        lr_exp: float = DEFAULT_LR_EXP,
+        lr_exp: float = None,
         lr_const: float = 1.0,
         lr_add_iter: int = 0,
         averaged: bool = False,
@@ -41,23 +40,6 @@ class SGD(BaseOptimizer):
         multiply_lr_const: bool = False,
         multiply_exp: float = None,
     ):
-        # if multiply is None:
-        #     multiply = True if batch_size > 1 else False
-        # if multiply:
-        #     lr_const *= np.sqrt(param.shape[0])
-        # # Name for plotting
-        # self.name = (
-        #     ("W" if averaged and log_weight != 0.0 else "")
-        #     + ("A" if averaged else "")
-        #     + "SGD"
-        #     + (f" α={lr_exp}")
-        #     + (f" c_α={lr_const}" if lr_const != 1.0 else "")
-        #     + (f" m" if multiply else "")
-        # )
-        # self.lr_exp = lr_exp
-        # self.lr_const = lr_const
-        # self.lr_add_iter = lr_add_iter
-
         super().__init__(
             param=param,
             obj_function=obj_function,
@@ -87,6 +69,10 @@ class SGD(BaseOptimizer):
 
         # Update the non averaged parameter
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
+        # learning_rate = min(learning_rate, 1.0) # TODO decide if we want to clip the learning rate
+        if learning_rate > 1:
+            print(f"Learning rate is larger than 1: {learning_rate}")
+            raise ValueError("Learning rate is larger than 1")
         self.param_not_averaged -= learning_rate * grad
 
         if self.averaged:

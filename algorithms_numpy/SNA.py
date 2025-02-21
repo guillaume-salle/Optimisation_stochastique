@@ -28,7 +28,7 @@ class SNA(BaseOptimizer):
     sherman_morrison (bool): Whether to use the Sherman-Morrison formula.
     """
 
-    DEFAULT_LR_EXP = 0.67  # for non-averaged
+    name = "SNA"
 
     def __init__(
         self,
@@ -48,9 +48,8 @@ class SNA(BaseOptimizer):
         multiply_lr_const: bool = False,
         multiply_exp: float = None,
     ):
-        if lr_exp is None:
-            lr_exp = 1.0 if not averaged else self.DEFAULT_LR_EXP
-        self.name = "SNA" + (" AP" if compute_hessian_param_avg else "")  # AP = Averaged Parameter
+        if compute_hessian_param_avg:
+            self.name += " AP"  # AP = Averaged Parameter
         self.identity_weight = identity_weight
         self.compute_hessian_param_avg = compute_hessian_param_avg
         self.compute_inverse = compute_inverse
@@ -145,6 +144,7 @@ class SNA(BaseOptimizer):
 
         # Update the non averaged parameter
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
+        # learning_rate = min(learning_rate, 1.0) # TODO decide if we want to clip the learning rate
         self.param_not_averaged -= learning_rate * self.hessian_inv @ grad
 
         if self.averaged:
