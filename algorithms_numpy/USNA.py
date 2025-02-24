@@ -2,40 +2,41 @@ import numpy as np
 from typing import Tuple
 
 from algorithms_numpy import BaseOptimizer
-from objective_functions_numpy_online import BaseObjectiveFunction
+from objective_functions_numpy.streaming import BaseObjectiveFunction
 
 
 class USNA(BaseOptimizer):
     """
-    Universal Stochastic Newton Algorithm optimizer, version described in the internship report.
+    Universal Stochastic Newton Algorithm optimizer.
     """
 
-    CONST_BETA = 1 / 2  # beta_n = CONST_BETA / gamma_n
+    name = "USNA"
+
+    CONST_BETA = 1 / 2  # beta_n := CONST_BETA / gamma_n
 
     def __init__(
         self,
         param: np.ndarray,
         obj_function: BaseObjectiveFunction,
-        batch_size: int = None,
-        batch_size_power: int = 0,
-        lr_exp: float = None,  # Not specified in the article for UWASNA, and set to 1.0 for USNA
-        lr_const: float = 1.0,  # Set to 1.0 in the article
-        lr_add_iter: int = 0,  # No specified in the article, 20 works well except linear regression which prefers 200
+        mini_batch: int = None,
+        mini_batch_power: float = 0.0,
+        lr_exp: float = None,
+        lr_const: float = BaseOptimizer.DEFAULT_LR_CONST,
+        lr_add_iter: int = BaseOptimizer.DEFAULT_LR_ADD_ITER,
+        averaged: bool = False,
+        log_weight: float = BaseOptimizer.DEFAULT_LOG_WEIGHT,
+        multiply_lr: float = BaseOptimizer.DEFAULT_MULTIPLY_LR,
+        # USNA specific parameters
         lr_hess_exp: float = 0.75,  # Set to 0.75 in the article
         lr_hess_const: float = 0.1,  # Not specified in the article, and 1.0 diverges
         lr_hess_add_iter: int = 400,  # Not specified, Works better
-        averaged: bool = False,  # Whether to use an averaged parameter
-        log_weight: float = 2.0,  # Exponent for the logarithmic weight
-        multiply_lr_const: bool = False,  # Whether to multiply the step size by the dimension
-        multiply_exp: float = None,  # Exponent for the dimension multiplier
         averaged_matrix: bool = False,  # Wether to use an averaged estimate of the inverse hessian
         log_weight_matrix: float = 2.0,  # Exponent for the logarithmic weight of the averaged inverse hessian
         compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
-        proj: bool = False,
+        proj: bool = True,  # If True, use Z Z^T instead of I_d in the update
     ):
-        self.name = (
-            "USNA"
-            + (" AM" if averaged_matrix else "")
+        self.name += (
+            (" AM" if averaged_matrix else "")
             + (" AP" if compute_hessian_param_avg else "")
             + (" P" if proj else "")
             + (f" γ={lr_hess_exp}" if lr_hess_exp != 0.75 else "")
@@ -50,7 +51,7 @@ class USNA(BaseOptimizer):
         self.proj = proj
 
         self.param_dim = param.shape[0]
-        self.matrix = np.eye(param.shape[0])
+        self.matrix = np.eye(param.shape[0]) * 0.1
         self.matrix_not_avg = np.copy(self.matrix) if averaged_matrix else self.matrix
         if averaged_matrix:
             self.sum_weights_matrix = 0
@@ -58,15 +59,14 @@ class USNA(BaseOptimizer):
         super().__init__(
             param=param,
             obj_function=obj_function,
-            batch_size=batch_size,
-            batch_size_power=batch_size_power,
+            mini_batch=mini_batch,
+            mini_batch_power=mini_batch_power,
             lr_exp=lr_exp,
             lr_const=lr_const,
             lr_add_iter=lr_add_iter,
             averaged=averaged,
             log_weight=log_weight,
-            multiply_lr_const=multiply_lr_const,
-            multiply_exp=multiply_exp,
+            multiply_lr=multiply_lr,
         )
 
     def step(
@@ -88,7 +88,8 @@ class USNA(BaseOptimizer):
 
         # Update theta
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
-        # learning_rate = min(learning_rate, 1.0) # TODO decide if we want to clip the learning rate
+        if self.multiply_lr and self.mini_batch > 1:
+            learning_rate = min(learning_rate, self.expected_first_lr)
         self.param_not_averaged -= learning_rate * self.matrix @ grad
 
         if self.averaged:

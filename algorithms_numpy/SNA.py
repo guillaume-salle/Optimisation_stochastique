@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple
 
 from algorithms_numpy import BaseOptimizer
-from objective_functions_numpy_online import BaseObjectiveFunction
+from objective_functions_numpy.streaming import BaseObjectiveFunction
 
 
 class SNA(BaseOptimizer):
@@ -12,17 +12,8 @@ class SNA(BaseOptimizer):
     Averaged parameter can be calculated with a logarithmic weight, i.e. the weight is
     calculated as log(n_iter+1)^weight_exp.
 
-    Parameters:
-    param (np.ndarray): Initial parameters for the optimizer.
-    obj_function (BaseObjectiveFunction): Objective function to optimize.
-    batch_size (int): Size of the batch.
-    batch_size_power (int): batch size as a power of the dimension of the parameter to optimize.
-    lr_exp (float): Exponent for learning rate decay.
-    lr_const (float): Constant multiplier for learning rate.
-    lr_add_iter (int): Additional iterations for learning rate calculation.
+    SNA specific parameters:
     identity_weight (int): Weight for the initial identity matrix.
-    averaged (bool): Whether to use an averaged parameter.
-    log_weight(float): Exponent for the logarithmic weight.
     compute_hessian_param_avg (bool): If averaged, where to compute the hessian.
     compute_inverse (bool): Actually compute the inverse, or just solve the system.
     sherman_morrison (bool): Whether to use the Sherman-Morrison formula.
@@ -34,19 +25,19 @@ class SNA(BaseOptimizer):
         self,
         param: np.ndarray,
         obj_function: BaseObjectiveFunction,
-        batch_size: int = None,
-        batch_size_power: int = 0,
+        mini_batch: int = None,
+        mini_batch_power: float = 0.0,
         lr_exp: float = None,
-        lr_const: float = 1.0,
-        lr_add_iter: int = 0,
-        identity_weight: int = 400,
+        lr_const: float = BaseOptimizer.DEFAULT_LR_CONST,
+        lr_add_iter: int = BaseOptimizer.DEFAULT_LR_ADD_ITER,
         averaged: bool = False,
-        log_weight: float = 2.0,
+        log_weight: float = BaseOptimizer.DEFAULT_LOG_WEIGHT,
+        multiply_lr: float = BaseOptimizer.DEFAULT_MULTIPLY_LR,
+        # SNA specific parameters :
+        identity_weight: int = 400,
         compute_hessian_param_avg: bool = False,
         compute_inverse: bool = False,
         sherman_morrison: bool = True,
-        multiply_lr_const: bool = False,
-        multiply_exp: float = None,
     ):
         if compute_hessian_param_avg:
             self.name += " AP"  # AP = Averaged Parameter
@@ -58,19 +49,18 @@ class SNA(BaseOptimizer):
         super().__init__(
             param=param,
             obj_function=obj_function,
-            batch_size=batch_size,
-            batch_size_power=batch_size_power,
+            mini_batch=mini_batch,
+            mini_batch_power=mini_batch_power,
             lr_exp=lr_exp,
             lr_const=lr_const,
             lr_add_iter=lr_add_iter,
             averaged=averaged,
             log_weight=log_weight,
-            multiply_lr_const=multiply_lr_const,
-            multiply_exp=multiply_exp,
+            multiply_lr=multiply_lr,
         )
 
         # For batch_size=1 we can use Sherman-Morrison formula if available
-        if batch_size == 1 and sherman_morrison and hasattr(obj_function, "sherman_morrison"):
+        if mini_batch == 1 and sherman_morrison and hasattr(obj_function, "sherman_morrison"):
             self.name += " SM"
             self.step = self.step_sherman_morrison
             self.hessian_inv = np.eye(param.shape[0])
@@ -103,6 +93,8 @@ class SNA(BaseOptimizer):
 
         # Update the non averaged parameter
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
+        if self.multiply_lr and self.mini_batch > 1:
+            learning_rate = min(learning_rate, self.expected_first_lr)
         if self.compute_inverse:
             self.hessian_inv = np.linalg.inv(self.hessian_bar)
             self.param_not_averaged -= learning_rate * self.hessian_inv @ grad
@@ -144,7 +136,6 @@ class SNA(BaseOptimizer):
 
         # Update the non averaged parameter
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
-        # learning_rate = min(learning_rate, 1.0) # TODO decide if we want to clip the learning rate
         self.param_not_averaged -= learning_rate * self.hessian_inv @ grad
 
         if self.averaged:

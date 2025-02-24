@@ -3,7 +3,7 @@ from functools import partial
 
 import algorithms_numpy as algo
 
-from objective_functions_numpy.streaming import (
+from objective_functions_numpy.online import (
     LinearRegression,
     LogisticRegression,
     GeometricMedian,
@@ -24,15 +24,15 @@ from datasets_numpy import (
 # Configuration for the number of runs and size of data
 N = 10
 n = int(1e4)
-dim = 50
+dim = 10
 
 # Configuration for true parameter
 # Value from the article:
-# true_param = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
+true_param = np.array([0.0, 3.0, -9.0, 4.0, -9.0, 15.0, 0.0, -7.0, 1.0, 0.0])
 # true_param = torch.tensor([-2.0, -1.0, 0.0, 1.0, 2.0])  # Slides, bias=False
 # true_param = torch.tensor([1, 1, 1, 1, 1])  # Poly, bias=False
-true_param = np.random.randn(dim)
-true_param[0] = 1.0  # Bias term
+# true_param = np.random.randn(dim)
+# true_param[0] = 1.0  # Bias term
 
 alpha_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
 gamma_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
@@ -90,7 +90,9 @@ simulation_logistic_regression_toeplitz = partial(
     Simulation,
     obj_function=LogisticRegression(bias=bias_setting),
     true_param=true_param,
-    generate_dataset=partial(generate_logistic_regression, bias=bias_setting),
+    generate_dataset=partial(
+        generate_logistic_regression, bias=bias_setting, toeplitz=True, diag=False
+    ),
     r_values=r_values,
 )
 
@@ -100,7 +102,9 @@ simulation_logistic_regression_toeplitz_diag = partial(
     Simulation,
     obj_function=LogisticRegression(bias=bias_setting),
     true_param=true_param,
-    generate_dataset=partial(generate_logistic_regression, bias=bias_setting),
+    generate_dataset=partial(
+        generate_logistic_regression, bias=bias_setting, toeplitz=True, diag=True
+    ),
     r_values=r_values,
 )
 

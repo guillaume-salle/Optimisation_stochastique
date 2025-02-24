@@ -12,14 +12,6 @@ class BaseInverseEstimator:
         pass
 
     @abstractmethod
-    def reset(self, matrix_dim: int) -> None:
-        """
-        Reset the estimator state.
-        Should be implemented by subclasses.
-        """
-        pass
-
-    @abstractmethod
     def step(self, matrix: np.ndarray) -> None:
         """
         Update the estimator with a new matrix.

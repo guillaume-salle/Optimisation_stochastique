@@ -15,12 +15,6 @@ class algo(BaseInverseEstimator):
         self.add_iter = add_iter
         self.dim = dim
 
-    def reset(self, dim: int):
-        """
-        Reset the estimator state
-        """
-        pass
-
     def step(
         self,
         random_matrix: np.ndarray,

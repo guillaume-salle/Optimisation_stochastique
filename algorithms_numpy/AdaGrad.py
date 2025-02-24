@@ -2,7 +2,7 @@ import numpy as np
 from typing import Tuple
 
 from algorithms_numpy import BaseOptimizer
-from objective_functions_numpy_online import BaseObjectiveFunction
+from objective_functions_numpy.streaming import BaseObjectiveFunction
 
 
 class AdaGrad(BaseOptimizer):
@@ -14,14 +14,15 @@ class AdaGrad(BaseOptimizer):
     Parameters:
     param (np.ndarray): Initial parameters for the optimizer.
     obj_function (BaseObjectiveFunction): Objective function to optimize.
-    batch_size (int): Size of the batch.
-    batch_size_power (int): batch size as a power of the dimension of the parameter to optimize.
+    mini_batch (int): Size of mini-batch.
+    mini_batch_power (float): size of mini-batch as a power of the dimension of the parameter to optimize.
     lr_exp (float): Exponent for learning rate decay.
     lr_const (float): Constant multiplier for learning rate.
     lr_add_iter (int): Additional iterations for learning rate calculation.
     averaged (bool): Whether to use an averaged parameter.
     log_exp (float): Exponent for the logarithmic weight.
     epsilon (float): Small constant to avoid singularity problems.
+    true_adagrad (bool): Whether to use the true Adagrad update rule, or one with a decreasing learning rate.
     """
 
     name = "Ada"
@@ -30,34 +31,34 @@ class AdaGrad(BaseOptimizer):
         self,
         param: np.ndarray,
         obj_function: BaseObjectiveFunction,
-        batch_size: int = None,
-        batch_size_power: int = None,
+        mini_batch: int = None,
+        mini_batch_power: float = 0.0,
         lr_exp: float = None,
-        lr_const: float = None,
-        lr_add_iter: int = None,
+        lr_const: float = BaseOptimizer.DEFAULT_LR_CONST,
+        lr_add_iter: int = BaseOptimizer.DEFAULT_LR_ADD_ITER,
         averaged: bool = None,
-        log_weight: float = None,
-        multiply_lr_const: bool = False,
-        multiply_exp: float = None,
+        log_weight: float = BaseOptimizer.DEFAULT_LOG_WEIGHT,
+        multiply_lr: float = BaseOptimizer.DEFAULT_MULTIPLY_LR,
+        # AdaGrad specific parameter
         epsilon: float = 1e-8,
+        true_ada: bool = True,
     ):
-        self.epsilon = epsilon
-
         # Initialize the sum of the gradients
-        self.sum_grad_sq = np.ones_like(param)
+        self.sum_grad_sq = np.zeros_like(param) + epsilon
+        self.true_ada = true_ada
+        self.name += " F" if not true_ada else ""
 
         super().__init__(
             param=param,
             obj_function=obj_function,
-            batch_size=batch_size,
-            batch_size_power=batch_size_power,
+            mini_batch=mini_batch,
+            mini_batch_power=mini_batch_power,
             lr_exp=lr_exp,
             lr_const=lr_const,
             lr_add_iter=lr_add_iter,
             averaged=averaged,
             log_weight=log_weight,
-            multiply_lr_const=multiply_lr_const,
-            multiply_exp=multiply_exp,
+            multiply_lr=multiply_lr,
         )
 
     def step(
@@ -76,10 +77,19 @@ class AdaGrad(BaseOptimizer):
         # Update the sum of the gradients
         self.sum_grad_sq += grad**2
 
-        # Update the non averaged parameter, add the division of sum_grad_sq by n_iter here, hence the +0.5
-        learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp + 0.5)
-        # learning_rate = min(learning_rate, 1.0) # TODO decide if we want to clip the learning rate
-        self.param_not_averaged -= learning_rate * grad / (np.sqrt(self.sum_grad_sq) + self.epsilon)
+        # Update the non averaged parameter
+        if self.true_ada:
+            # Constant learning, same as the first iteration for comparison
+            learning_rate = self.lr_const * (1 + self.lr_add_iter) ** (-self.lr_exp)
+        else:
+            learning_rate = (
+                self.lr_const
+                * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
+                * np.sqrt(self.n_iter)
+            )
+        if self.multiply_lr and self.mini_batch > 1:
+            learning_rate = min(learning_rate, self.expected_first_lr)
+        self.param_not_averaged -= learning_rate * grad / np.sqrt(self.sum_grad_sq)
 
         if self.averaged:
             self.update_averaged_param()

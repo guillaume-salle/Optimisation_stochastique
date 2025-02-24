@@ -2,8 +2,8 @@ import numpy as np
 import math
 from typing import Tuple
 
-from algorithms_numpy import USNA
-from objective_functions_numpy_online import BaseObjectiveFunction
+from algorithms_numpy import USNA, BaseOptimizer
+from objective_functions_numpy.streaming import BaseObjectiveFunction
 
 
 class USNA_variants(USNA):
@@ -15,21 +15,23 @@ class USNA_variants(USNA):
         self,
         param: np.ndarray,
         obj_function: BaseObjectiveFunction,
-        batch_size: int = None,
-        batch_size_power: int = 0,
-        lr_exp: float = None,  # Not specified in the article for UWASNA, and set to 1.0 for USNA
-        lr_const: float = 1.0,  # Set to 1.0 in the article
-        lr_add_iter: int = 0,  # No specified in the article, 20 works well except linear regression which prefers 200
-        lr_hess_exp: float = 0.75,  # Set to 0.75 in the article
-        lr_hess_const: float = 0.1,  # Not specified in the article, and 1.0 diverges
-        lr_hess_add_iter: int = 400,  # Not specified, Works better
-        averaged: bool = False,  # Whether to use an averaged parameter
-        log_weight: float = 2.0,  # Exponent for the logarithmic weight
-        averaged_matrix: bool = False,  # Wether to use an averaged estimate of the inverse hessian
-        log_weight_matrix: float = 2.0,  # Exponent for the logarithmic weight of the averaged inverse hessian
-        compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
+        mini_batch: int = None,
+        mini_batch_power: float = 0.0,
+        lr_exp: float = None,
+        lr_const: float = BaseOptimizer.DEFAULT_LR_CONST,
+        lr_add_iter: int = BaseOptimizer.DEFAULT_LR_ADD_ITER,
+        averaged: bool = False,
+        log_weight: float = BaseOptimizer.DEFAULT_LOG_WEIGHT,
+        multiply_lr: float = BaseOptimizer.DEFAULT_MULTIPLY_LR,
+        # USNA specific parameters
+        lr_hess_exp: float = 0.75,
+        lr_hess_const: float = 0.1,
+        lr_hess_add_iter: int = 400,
+        averaged_matrix: bool = False,
+        log_weight_matrix: float = 2.0,
+        compute_hessian_param_avg: bool = False,
         proj: bool = False,
-        # New parameters
+        # New parameters for the variants
         generate_Z: str = "canonic",
         sym: bool = True,  # Symmetric estimate of the hessian
         multiply_between: bool = False,  # If Z Z^T is placed between the product A H_n, or outside
@@ -38,16 +40,17 @@ class USNA_variants(USNA):
         super().__init__(
             param=param,
             obj_function=obj_function,
-            batch_size=batch_size,
-            batch_size_power=batch_size_power,
+            mini_batch=mini_batch,
+            mini_batch_power=mini_batch_power,
             lr_exp=lr_exp,
             lr_const=lr_const,
             lr_add_iter=lr_add_iter,
+            averaged=averaged,
+            log_weight=log_weight,
+            multiply_lr=multiply_lr,
             lr_hess_exp=lr_hess_exp,
             lr_hess_const=lr_hess_const,
             lr_hess_add_iter=lr_hess_add_iter,
-            averaged=averaged,
-            log_weight=log_weight,
             averaged_matrix=averaged_matrix,
             log_weight_matrix=log_weight_matrix,
             compute_hessian_param_avg=compute_hessian_param_avg,

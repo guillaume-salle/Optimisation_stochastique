@@ -20,7 +20,7 @@ from torch.utils.data import Dataset, DataLoader
 # My imports
 from datasets_numpy import MyDataset
 from algorithms_numpy import BaseOptimizer
-from objective_functions_numpy_streaming import BaseObjectiveFunction
+from objective_functions_numpy.streaming import BaseObjectiveFunction
 
 
 class Simulation:
@@ -29,7 +29,7 @@ class Simulation:
     on a given objective function, with computable gradient and hessian.
     """
 
-    REFRESH_OUTPUT = False
+    REFRESH_OUTPUT = False  # Clear the cell output, because of tqdm bug when reopen notebook
 
     def __init__(
         self,
@@ -117,7 +117,8 @@ class Simulation:
 
         # Generate the initial parameter
         loc = self.true_param if self.true_param is not None else np.zeros(param_dim)
-        self.initial_param = loc + variance * np.random.randn(param_dim)
+        normal = np.random.randn(param_dim)
+        self.initial_param = loc + variance * normal / np.linalg.norm(normal)
 
         # Convert to torch tensor if needed
         if self.use_torch:
@@ -135,7 +136,7 @@ class Simulation:
         """
         # Log the estimation error of the parameter
         diff = self.param - self.true_param
-        param_error = np.dot(diff, diff) if not self.use_torch else torch.dot(diff, diff).item()
+        param_error = np.linalg.norm(diff) ** 2
         param_errors[optimizer.name].append((n, param_error))
 
         # Log the estimation error of condition matrix estimation if a true matrix is provided
@@ -190,7 +191,7 @@ class Simulation:
             optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
-            batch_size = optimizer.batch_size
+            batch_size = optimizer.mini_batch
             if self.use_torch:
                 data_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
             else:
@@ -263,7 +264,7 @@ class Simulation:
             optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
-            batch_size = optimizer.batch_size
+            batch_size = optimizer.mini_batch
             if self.use_torch:
                 data_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
             else:
@@ -332,6 +333,26 @@ class Simulation:
 
         return execution_times, metrics_dict
 
+    # Called by the previous method (run_track_time) to highlight the best values in a DataFrame
+    @staticmethod
+    def highlight_best(data, order: str):
+        """
+        Highlight the minimum or maximum in a DataFrame or Series row with bold font
+        """
+        if order not in ["min", "max"]:
+            raise ValueError("order must be 'min' or 'max'")
+        attr = "font-weight: bold"
+        if data.ndim == 1:  # Series from a DataFrame.apply(axis=1)
+            best = data.min() if order == "min" else data.max()
+            return [attr if v == best else "" for v in data]
+        else:  # DataFrame direct styling
+            best = data.min(axis=1) if order == "min" else data.max(axis=1)
+            return pd.DataFrame(
+                np.where(data == best[:, None], attr, ""),
+                index=data.index,
+                columns=data.columns,
+            )
+
     def run_multiple_track_errors(self, N: int = 100, n: int = 10_000, eval_time: bool = False):
         """
         Run the experiment multiple times by generating a new dataset and initial paramter each time.
@@ -395,7 +416,7 @@ class Simulation:
 
         # Plot errors
         if self.REFRESH_OUTPUT:
-            # Clear the cell output, because of tqdm bug widgets after reopen
+            # Clear the cell output, because of tqdm bug widgets after reopen notebook
             clear_output(wait=True)
         ylabel = r"$\| \theta - \theta^* \|^2$"
         self.plot_errors(all_param_errors_avg, ylabel, N)
@@ -480,11 +501,14 @@ class Simulation:
             ax.set_xlabel("Iteration")
             ax.set_title(f"r={e}")
 
+            n_max = len(self.dataset)
+            steps_interp = np.arange(1, n_max + 2, 1)
+
             for idx, (name, errors) in enumerate(errors_dict.items()):
                 # Markers to distinguish the optimizers
                 markevery = (idx / len(errors_dict), 0.2)
-                steps, values = zip(*errors)
-                steps_interp = np.arange(0, steps[-1] + 1, 1)
+                steps = [s + 1 for s, _ in errors]
+                values = [v for _, v in errors]
                 values_interp = np.interp(steps_interp, steps, values)
                 ax.plot(
                     steps_interp,
@@ -495,36 +519,20 @@ class Simulation:
                     markevery=markevery,
                 )
 
-            ax.legend(loc="lower left")
+            initial_error = errors_dict[self.names_list[0]][0][1]
+            ax.set_ylim(top=10 * initial_error)
+            # ax.legend(loc="lower left")
+            ax.legend(loc="best")
 
         # Adjust layout to provide space for ylabel
         fig.subplots_adjust(left=0.1)
         fig.text(0.0, 0.5, ylabel, va="center", rotation="vertical")
 
         plt.suptitle(
-            f"{self.obj_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}"
+            f"{self.obj_function.name} model, {self.dataset_name} dataset, dim={self.true_param.shape[0]}, average over {N} run{'s'*(N!=1)}"
         )
         plt.tight_layout(pad=3.0)
         plt.show()
-
-    @staticmethod
-    def highlight_best(data, order: str):
-        """
-        Highlight the minimum or maximum in a DataFrame or Series row with bold font
-        """
-        if order not in ["min", "max"]:
-            raise ValueError("order must be 'min' or 'max'")
-        attr = "font-weight: bold"
-        if data.ndim == 1:  # Series from a DataFrame.apply(axis=1)
-            best = data.min() if order == "min" else data.max()
-            return [attr if v == best else "" for v in data]
-        else:  # DataFrame direct styling
-            best = data.min(axis=1) if order == "min" else data.max(axis=1)
-            return pd.DataFrame(
-                np.where(data == best[:, None], attr, ""),
-                index=data.index,
-                columns=data.columns,
-            )
 
     def boxplot_time_and_errors(
         self, all_execution_times: dict, all_last_param_error: dict, N: int
@@ -533,7 +541,7 @@ class Simulation:
         Make boxplots of the execution times and last parameter errors of all optimizers using seaborn
         """
         if self.REFRESH_OUTPUT:
-            # Clear the cell output, because of tqdm bug widgets after reopen
+            # Clear the cell output, because of tqdm bug widgets after reopen notebook
             clear_output(wait=True)
 
         num_subplots = len(all_execution_times) * 2
@@ -541,35 +549,68 @@ class Simulation:
 
         r_values = list(all_execution_times.keys())
 
-        # Initialize lists for legend handles
         handles = []
-
         for i, r in enumerate(r_values):
             ax1 = axes[2 * i]
             ax2 = axes[2 * i + 1]
 
-            # Boxplot with seaborn
+            # Boxplot execution times with assigned colors
             box1 = sns.boxplot(data=all_execution_times[r], ax=ax1)
-            box2 = sns.boxplot(data=all_last_param_error[r], ax=ax2)
-
             ax1.set_title(f"r={r}")
             ax1.set_ylabel("time (s)")
             ax1.set_ylim(bottom=0)
             ax1.set_xticklabels([])  # Remove x-axis labels
-            ax2.set_ylabel("error")
-            ax2.set_ylim(bottom=0)
-            ax2.set_xticklabels([])  # Remove x-axis labels
 
-            # Collect handles and labels for the legend from the first set of plots
-            if i == 0:
+            if not handles:
+                # Collect handles and labels for the legend from the first set of plots
                 for patch, label in zip(box1.patches, all_execution_times[r].keys()):
                     handles.append(mpatches.Patch(color=patch.get_facecolor(), label=label))
+            # else:
+            #     # Check if the patch and label are already in the handles
+            #     for patch, label in zip(box1.patches, all_execution_times[r].keys()):
+            #         if not any(h.get_label() == label for h in handles):
+            #             raise ValueError("Execution times are not in the same order")
+
+            # Detect outliers in errors
+            errors_dict = all_last_param_error[r]
+            all_errors = np.concatenate(list(errors_dict.values()))
+            global_median = np.median(all_errors)
+            threshold = 100 * global_median
+            normalized_errors = {
+                k: v if np.median(v) < threshold else [0] for k, v in errors_dict.items()
+            }
+            outlier_optimizers = [k for k, v in errors_dict.items() if np.median(v) >= threshold]
+
+            # Boxplot only normal optimizers for errors
+            box2 = sns.boxplot(data=list(normalized_errors.values()), ax=ax2)
+            ax2.set_title(f"r={r}")
+            ax2.set_ylabel("error")
+            ax2.set_xticklabels([])  # Remove x-axis labels
+            ax2.set_ylim(bottom=0)
+
+            # # Check if the handles are in the same order
+            # for patch, label in zip(box2.patches, all_execution_times[r].keys()):
+            #     if not any(h.get_label() == label for h in handles):
+            #         raise ValueError("Execution times are not in the same order")
+
+            # Print/Annotate excluded optimizers
+            if outlier_optimizers:
+                print(f"Excluded optimizers (diverged) for r={r}: {outlier_optimizers}")
+                ax2.text(
+                    0.5,
+                    0.9,
+                    "⚠️ Some optimizers excluded",
+                    ha="center",
+                    va="center",
+                    transform=ax2.transAxes,
+                    color="red",
+                )
 
         # Create a single legend outside the plotting area
         fig.legend(handles=handles, loc="center left", bbox_to_anchor=(1.0, 0.5), ncol=1)
 
         plt.suptitle(
-            f"{self.obj_function.name} model, {self.dataset_name} dataset, average over {N} run{'s'*(N!=1)}"
+            f"{self.obj_function.name} model, {self.dataset_name} dataset, dim={self.true_param.shape[0]}, average over {N} run{'s'*(N!=1)}"
         )
         plt.tight_layout(rect=[0, 0, 1, 1])  # Adjust layout to make room for the legend
         plt.show()
