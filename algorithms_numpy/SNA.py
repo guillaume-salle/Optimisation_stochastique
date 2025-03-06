@@ -8,9 +8,6 @@ from objective_functions_numpy.streaming import BaseObjectiveFunction
 class SNA(BaseOptimizer):
     """
     Stochastic Newton Algorithm optimizer
-    Uses a learning rate lr = lr_const * (n_iter + lr_add_iter)^(-lr_exp) for optimization.
-    Averaged parameter can be calculated with a logarithmic weight, i.e. the weight is
-    calculated as log(n_iter+1)^weight_exp.
 
     SNA specific parameters:
     identity_weight (int): Weight for the initial identity matrix.
@@ -25,14 +22,14 @@ class SNA(BaseOptimizer):
         self,
         param: np.ndarray,
         obj_function: BaseObjectiveFunction,
-        mini_batch: int = None,
-        mini_batch_power: float = 0.0,
+        batch_size: int = None,
+        batch_size_power: float = 0.0,
         lr_exp: float = None,
         lr_const: float = BaseOptimizer.DEFAULT_LR_CONST,
-        lr_add_iter: int = BaseOptimizer.DEFAULT_LR_ADD_ITER,
+        lr_add_iter: int = None,
         averaged: bool = False,
         log_weight: float = BaseOptimizer.DEFAULT_LOG_WEIGHT,
-        multiply_lr: float = BaseOptimizer.DEFAULT_MULTIPLY_LR,
+        multiply_lr: float | str = 0.0,
         # SNA specific parameters :
         identity_weight: int = 400,
         compute_hessian_param_avg: bool = False,
@@ -49,8 +46,8 @@ class SNA(BaseOptimizer):
         super().__init__(
             param=param,
             obj_function=obj_function,
-            mini_batch=mini_batch,
-            mini_batch_power=mini_batch_power,
+            batch_size=batch_size,
+            batch_size_power=batch_size_power,
             lr_exp=lr_exp,
             lr_const=lr_const,
             lr_add_iter=lr_add_iter,
@@ -60,7 +57,7 @@ class SNA(BaseOptimizer):
         )
 
         # For batch_size=1 we can use Sherman-Morrison formula if available
-        if mini_batch == 1 and sherman_morrison and hasattr(obj_function, "sherman_morrison"):
+        if self.batch_size == 1 and sherman_morrison and hasattr(obj_function, "sherman_morrison"):
             self.name += " SM"
             self.step = self.step_sherman_morrison
             self.hessian_inv = np.eye(param.shape[0])
@@ -93,7 +90,7 @@ class SNA(BaseOptimizer):
 
         # Update the non averaged parameter
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
-        if self.multiply_lr and self.mini_batch > 1:
+        if self.multiply_lr and self.batch_size > 1:
             learning_rate = min(learning_rate, self.expected_first_lr)
         if self.compute_inverse:
             self.hessian_inv = np.linalg.inv(self.hessian_bar)

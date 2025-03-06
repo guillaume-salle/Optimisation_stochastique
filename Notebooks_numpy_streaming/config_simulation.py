@@ -23,8 +23,8 @@ from datasets_numpy import (
 
 # Configuration for the number of runs and size of data
 N = 10
-n = int(1e4)
-dim = 50
+n = int(1e5)
+dim = 100
 
 # Configuration for true parameter
 # Value from the article:
@@ -34,78 +34,71 @@ dim = 50
 true_param = np.random.randn(dim)
 true_param[0] = 1.0  # Bias term
 
-alpha_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
-gamma_list = [0.45, 0.5, 0.66, 0.75, 1.0, 1.05]
-r_values = [1, 5]
+# r_values = [1, 5]
+r_values = [1, 2]
 
 # Linear regression
-bias_setting = True
+bias = True
 simulation_linear_regression = partial(
     Simulation,
-    obj_function=LinearRegression(bias=bias_setting),
+    obj_function=LinearRegression(bias=bias),
     true_param=true_param,
-    generate_dataset=partial(
-        generate_linear_regression, bias=bias_setting, toeplitz=False, diag=False
-    ),
+    generate_dataset=partial(generate_linear_regression, bias=bias),
     r_values=r_values,
 )
 
 # Linear regression Toeplitz
-bias_setting = True
+bias = True
 simulation_linear_regression_toeplitz = partial(
     Simulation,
-    obj_function=LinearRegression(bias=bias_setting),
+    obj_function=LinearRegression(bias=bias),
     true_param=true_param,
-    generate_dataset=partial(
-        generate_linear_regression, bias=bias_setting, toeplitz=True, diag=False
-    ),
+    generate_dataset=partial(generate_linear_regression, bias=bias, toeplitz=True),
     r_values=r_values,
 )
 
 # Linear regression Toeplitz + diag
-bias_setting = True
+bias = True
 simulation_linear_regression_toeplitz_diag = partial(
     Simulation,
-    obj_function=LinearRegression(bias=bias_setting),
+    obj_function=LinearRegression(bias=bias),
     true_param=true_param,
-    generate_dataset=partial(
-        generate_linear_regression, bias=bias_setting, toeplitz=True, diag=True
-    ),
+    generate_dataset=partial(generate_linear_regression, bias=bias, toeplitz=True, diag=True),
     r_values=r_values,
 )
 
 # Logistic regression
-bias_setting = True
+bias = True
 simulation_logistic_regression = partial(
     Simulation,
-    obj_function=LogisticRegression(bias=bias_setting),
+    obj_function=LogisticRegression(bias=bias),
     true_param=true_param,
-    generate_dataset=partial(generate_logistic_regression, bias=bias_setting),
+    generate_dataset=partial(generate_logistic_regression, bias=bias, toeplitz=True),
     r_values=r_values,
 )
 
 # Logistic regression Toeplitz
-bias_setting = True
+bias = True
 simulation_logistic_regression_toeplitz = partial(
     Simulation,
-    obj_function=LogisticRegression(bias=bias_setting),
+    obj_function=LogisticRegression(bias=bias),
     true_param=true_param,
-    generate_dataset=partial(generate_logistic_regression, bias=bias_setting),
+    generate_dataset=partial(generate_logistic_regression, bias=bias, toeplitz=True, diag=True),
     r_values=r_values,
 )
 
 # Logistic regression Toeplitz + diag
-bias_setting = True
+bias = True
 simulation_logistic_regression_toeplitz_diag = partial(
     Simulation,
-    obj_function=LogisticRegression(bias=bias_setting),
+    obj_function=LogisticRegression(bias=bias),
     true_param=true_param,
-    generate_dataset=partial(generate_logistic_regression, bias=bias_setting),
+    generate_dataset=partial(generate_logistic_regression, bias=bias),
     r_values=r_values,
 )
 
 # Geometric median
-true_param_geometric_median = np.zeros(10)
+true_param_geometric_median = np.zeros(dim)
 simulation_geometric_median = partial(
     Simulation,
     obj_function=GeometricMedian(),

@@ -3,13 +3,14 @@ from typing import Tuple
 from datasets_numpy import MyDataset
 
 
-def toeplitz_matrix(n: int, const: float = 0.9, diag: bool = True) -> np.ndarray:
+def toeplitz_matrix(n: int, const: float = 0.9, diag: bool = False) -> np.ndarray:
     """
     Generate a Toeplitz matrix of size n with a modified diagonal
 
     Parameters:
     n (int): Size of the matrix.
-    const (float): Constant value for the matrix.
+    const (float): Value to be taken to the power of the absolute difference between the indices.
+    diag (bool): Whether the diagonal should be modified.
 
     Returns:
     np.ndarray: Toeplitz matrix.
@@ -20,10 +21,7 @@ def toeplitz_matrix(n: int, const: float = 0.9, diag: bool = True) -> np.ndarray
             if i != j:
                 matrix[i, j] = const ** abs(i - j)
             else:
-                if diag:
-                    matrix[i, j] = 1 + i
-                else:
-                    matrix[i, j] = 1
+                matrix[i, j] = (1 + i) if diag else 1
     return matrix
 
 

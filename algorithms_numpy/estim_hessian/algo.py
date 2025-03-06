@@ -1,24 +1,32 @@
 import numpy as np
 from typing import Tuple
 
+from objective_functions_numpy.streaming import BaseObjectiveFunction
 from algorithms_numpy.estim_hessian import BaseInverseEstimator
 
-class algo(BaseInverseEstimator):
-    '''
-    Estimation of the inverse of a matrix from random samples
-    '''
 
-    def __init__(self, gamma: float, c_gamma: float = 1.0, add_iter: int = 0, dim: int):
-        self.name = "algo" + f" γ={gamma}"
-        self.gamma = gamma
-        self.c_gamma = c_gamma
-        self.add_iter = add_iter
+class algo(BaseInverseEstimator):
+    """
+    Estimation of the inverse of a matrix from random samples
+    """
+
+    def __init__(
+        self,
+        matrix: np.ndarray,
+        obj_function: BaseObjectiveFunction,
+        lr_exp: float,
+        lr_const: float = 1.0,
+        lr_add_iter: int = 0,
+    ):
+        self.name = "algo" + f" γ={lr_exp}"
+        self.gamma = lr_exp
+        self.c_gamma = lr_const
+        self.add_iter = lr_add_iter
         self.dim = dim
 
     def step(
         self,
-        random_matrix: np.ndarray,
-
+        data: np.ndarray | Tuple[np.ndarray, np.ndarray],
     ):
         """
         Perform one optimization step

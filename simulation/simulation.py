@@ -65,6 +65,13 @@ class Simulation:
         self.true_matrix = true_matrix
         self.initial_param = initial_param
         self.initial_variances = r_values
+
+        if true_param is not None:
+            self.param_dim = true_param.shape[0]
+        elif dataset is not None:
+            self.param_dim = self.obj_function.get_param_dim(next(iter(dataset)))
+        else:
+            raise ValueError("true_param or dataset must be provided")
         self.check_duplicate_names()
 
         # Set the device for torch tensors
@@ -90,7 +97,9 @@ class Simulation:
         raw_list = []
         names_list = []
         for optimizer_class in self.optimizer_list:
-            optimizer = optimizer_class(obj_function=self.obj_function, param=np.zeros(1))
+            optimizer = optimizer_class(
+                obj_function=self.obj_function, param=np.zeros(self.param_dim)
+            )
             if optimizer.name in raw_list:
                 count = raw_list.count(optimizer.name)
                 name = f"{optimizer.name} ({count})"
@@ -104,27 +113,16 @@ class Simulation:
         """
         Generate a random initial parameter around the true parameter with a given noise level.
         """
-        # Get the dimension of the parameter from the dataset
-        if self.dataset is None:
-            raise ValueError("dataset is not set")
-        param_dim = self.obj_function.get_param_dim(data=next(iter(self.dataset)))
-
-        # Check if the true parameter has the same dimension
-        if self.true_param is not None and self.true_param.shape[0] != param_dim:
-            raise ValueError(
-                f"true_param dim ({self.true_param.size(0)}) does not match param_dim ({param_dim}) from the dataset"
-            )
-
         # Generate the initial parameter
-        loc = self.true_param if self.true_param is not None else np.zeros(param_dim)
-        normal = np.random.randn(param_dim)
+        loc = self.true_param if self.true_param is not None else np.zeros(self.param_dim)
+        normal = np.random.randn(self.param_dim)
         self.initial_param = loc + variance * normal / np.linalg.norm(normal)
 
         # Convert to torch tensor if needed
         if self.use_torch:
             self.initial_param = torch.as_tensor(self.initial_param, device=self.device)
 
-    def logging_estimation_error(
+    def logging_error(
         self,
         param_errors: dict[str, list],
         matrix_errors: dict[str, list],
@@ -135,17 +133,20 @@ class Simulation:
         Log the estimation error of the parameter and matrix with either numpy or torch tensors
         """
         # Log the estimation error of the parameter
-        diff = self.param - self.true_param
-        param_error = np.linalg.norm(diff) ** 2
+        diff = optimizer.param - self.true_param
+        if self.use_torch:
+            param_error = torch.linalg.vector_norm(diff).item() ** 2
+        else:
+            param_error = np.linalg.norm(diff) ** 2
         param_errors[optimizer.name].append((n, param_error))
 
         # Log the estimation error of condition matrix estimation if a true matrix is provided
         if self.true_matrix is not None and hasattr(optimizer, "matrix"):
-            diff = optimizer.matrix - self.true_matrix
-            if not self.use_torch:
-                matrix_error = np.linalg.norm(diff, ord="fro") ** 2
+            diff_matrix = optimizer.matrix - self.true_matrix
+            if self.use_torch:
+                matrix_error = torch.linalg.matrix_norm(diff_matrix, ord="fro").item() ** 2
             else:
-                matrix_error = torch.norm(diff, p="fro").item() ** 2
+                matrix_error = np.linalg.norm(diff_matrix, ord="fro") ** 2
             matrix_errors[optimizer.name].append((n, matrix_error))
 
     def run_track_errors(
@@ -191,7 +192,7 @@ class Simulation:
             optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
-            batch_size = optimizer.mini_batch
+            batch_size = optimizer.batch_size
             if self.use_torch:
                 data_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
             else:
@@ -199,13 +200,13 @@ class Simulation:
 
             # Log initial error
             n = 0
-            self.logging_estimation_error(param_errors, matrix_errors, optimizer, n)
+            self.logging_error(param_errors, matrix_errors, optimizer, n)
 
             # Run the optimizer on the dataset
             for data in data_loader:
                 optimizer.step(data)
                 n += batch_size
-                self.logging_estimation_error(param_errors, matrix_errors, optimizer, n)
+                self.logging_error(param_errors, matrix_errors, optimizer, n)
                 data_pbar.update(batch_size)
 
             optimizer_pbar.update(1)
@@ -230,7 +231,7 @@ class Simulation:
             Tuple[dict, dict]: Dictionaries of execution times and last paramter error
                 for all optimizers
         """
-        # Determine the metric to evaluate,
+        # Determine the metric to evaluate
         if self.true_param is not None:
             metrics = "last parameter error"
         elif self.test_dataset is not None:
@@ -238,7 +239,6 @@ class Simulation:
         else:
             raise ValueError("true_param and/or test_dataset are not set")
 
-        # Store execution times, and last parameter error and accuracies if possible to evaluate
         execution_times = {}
         metrics_dict = {}
 
@@ -264,7 +264,7 @@ class Simulation:
             optimizer_pbar.set_description(optimizer.name)
 
             # Initialize the data loader
-            batch_size = optimizer.mini_batch
+            batch_size = optimizer.batch_size
             if self.use_torch:
                 data_loader = DataLoader(self.dataset, batch_size=batch_size, shuffle=False)
             else:
@@ -281,10 +281,12 @@ class Simulation:
             time_end = time.time()
             execution_times[optimizer.name] = time_end - time_start
             if metrics == "last parameter error":
-                # TODO: ensure torch compatibility
-                metrics_dict[optimizer.name] = np.dot(
-                    self.param - self.true_param, self.param - self.true_param
-                )
+                diff = optimizer.param - self.true_param
+                if self.use_torch:
+                    error = torch.linalg.vector_norm(diff).item() ** 2
+                else:
+                    error = np.linalg.norm(diff) ** 2
+                metrics_dict[optimizer.name] = error
             elif metrics == "accuracies":
                 train_acc = self.obj_function.evaluate_accuracy(self.dataset, self.param)
                 test_acc = self.obj_function.evaluate_accuracy(self.test_dataset, self.param)
@@ -565,11 +567,6 @@ class Simulation:
                 # Collect handles and labels for the legend from the first set of plots
                 for patch, label in zip(box1.patches, all_execution_times[r].keys()):
                     handles.append(mpatches.Patch(color=patch.get_facecolor(), label=label))
-            # else:
-            #     # Check if the patch and label are already in the handles
-            #     for patch, label in zip(box1.patches, all_execution_times[r].keys()):
-            #         if not any(h.get_label() == label for h in handles):
-            #             raise ValueError("Execution times are not in the same order")
 
             # Detect outliers in errors
             errors_dict = all_last_param_error[r]
@@ -588,11 +585,6 @@ class Simulation:
             ax2.set_xticklabels([])  # Remove x-axis labels
             ax2.set_ylim(bottom=0)
 
-            # # Check if the handles are in the same order
-            # for patch, label in zip(box2.patches, all_execution_times[r].keys()):
-            #     if not any(h.get_label() == label for h in handles):
-            #         raise ValueError("Execution times are not in the same order")
-
             # Print/Annotate excluded optimizers
             if outlier_optimizers:
                 print(f"Excluded optimizers (diverged) for r={r}: {outlier_optimizers}")
@@ -606,7 +598,6 @@ class Simulation:
                     color="red",
                 )
 
-        # Create a single legend outside the plotting area
         fig.legend(handles=handles, loc="center left", bbox_to_anchor=(1.0, 0.5), ncol=1)
 
         plt.suptitle(
