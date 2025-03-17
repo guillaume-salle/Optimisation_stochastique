@@ -22,6 +22,8 @@ def toeplitz_matrix(n: int, const: float = 0.9, diag: bool = False) -> np.ndarra
                 matrix[i, j] = const ** abs(i - j)
             else:
                 matrix[i, j] = (1 + i) if diag else 1
+    if diag:
+        matrix /= n
     return matrix
 
 

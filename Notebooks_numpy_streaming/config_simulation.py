@@ -23,8 +23,8 @@ from datasets_numpy import (
 
 # Configuration for the number of runs and size of data
 N = 10
-n = int(1e5)
-dim = 100
+n = int(1e8)
+dim = 200
 
 # Configuration for true parameter
 # Value from the article:
@@ -34,8 +34,7 @@ dim = 100
 true_param = np.random.randn(dim)
 true_param[0] = 1.0  # Bias term
 
-# r_values = [1, 5]
-r_values = [1, 2]
+r_values = [0.5, 5.0]
 
 # Linear regression
 bias = True
@@ -73,7 +72,7 @@ simulation_logistic_regression = partial(
     Simulation,
     obj_function=LogisticRegression(bias=bias),
     true_param=true_param,
-    generate_dataset=partial(generate_logistic_regression, bias=bias, toeplitz=True),
+    generate_dataset=partial(generate_logistic_regression, bias=bias),
     r_values=r_values,
 )
 
@@ -83,7 +82,7 @@ simulation_logistic_regression_toeplitz = partial(
     Simulation,
     obj_function=LogisticRegression(bias=bias),
     true_param=true_param,
-    generate_dataset=partial(generate_logistic_regression, bias=bias, toeplitz=True, diag=True),
+    generate_dataset=partial(generate_logistic_regression, bias=bias, toeplitz=True),
     r_values=r_values,
 )
 
@@ -93,7 +92,7 @@ simulation_logistic_regression_toeplitz_diag = partial(
     Simulation,
     obj_function=LogisticRegression(bias=bias),
     true_param=true_param,
-    generate_dataset=partial(generate_logistic_regression, bias=bias),
+    generate_dataset=partial(generate_logistic_regression, bias=bias, toeplitz=True, diag=True),
     r_values=r_values,
 )
 
