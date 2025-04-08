@@ -20,22 +20,21 @@ class BaseOptimizer(ABC):
 
     DEFAULT_LR_EXP = 0.67  # Default value for the learning rate exponent for averaged algorithms
     DEFAULT_LR_CONST = 1.0
-    DEFAULT_LR_ADD_ITER = 50  # TODO : put dim here
     DEFAULT_LOG_WEIGHT = 2.0
-    DEFAULT_MULTIPLY_LR = 0.33  # multiply the learning rate by an exponent of the mini-batch size
+    DEFAULT_BATCH_SIZE_POWER = 0.5
 
     def __init__(
         self,
         param: np.ndarray,
         obj_function: BaseObjectiveFunction,
-        mini_batch: int | None,
-        mini_batch_power: float,
+        batch_size: int | None,
+        batch_size_power: float,
         averaged: bool,
         lr_exp: float | None,
         lr_const: float,
-        lr_add_iter: int,
+        lr_add_iter: int | None,
         log_weight: float,
-        multiply_lr: float,
+        multiply_lr: float | str,
     ) -> None:
         """
         Initialize the optimizer with parameters.
@@ -44,24 +43,23 @@ class BaseOptimizer(ABC):
         Args:
             param (np.ndarray): The initial parameters for the optimizer.
             obj_function (BaseObjectiveFunction): The objective function to optimize.
-            mini_batch (int): The mini-batch size for optimization. If None, calculated from the power of the dimension.
-            mini_batch_power (float): The power of the dimension for the mini-batch size.
+            batch_size (int): The mini-batch size for optimization. If None, calculated from the power of the dimension.
+            batch_size_power (float): The power of the dimension for the mini-batch size.
             lr_exp (float): The exponent for the learning rate. If None, set to 1 for non averaged algorithms and to the default value for averaged algorithms.
             lr_const (float): The constant for the learning rate.
-            lr_add_iter (int): The number of iterations to add to the learning rate.
+            lr_add_iter (int): The number of iterations to add to the learning rate. If None, set to the dimension of the parameter.
             averaged (bool): Whether to use an averaged parameter
             log_exp (float): Exponent for the logarithmic weight.
-            multiply_lr (float): Multiply the learning rate by mini_batch_size^multiply_lr, for mini-batch.
+            multiply_lr (float | str): Multiply the learning rate by mini_batch_size^multiply_lr, for mini-batch. 0 for no multiplication
         """
         self.param = param
         self.obj_function = obj_function
         # Batch size is either given or if not, calculated from the power of the dimension
-        if mini_batch is not None:
-            self.mini_batch = mini_batch
-            self.mini_batch_power = np.log(mini_batch) / np.log(param.shape[0])
+        if batch_size is not None:
+            self.batch_size = batch_size
         else:
-            self.mini_batch_power = mini_batch_power
-            self.mini_batch = int(param.shape[0] ** self.mini_batch_power)
+            batch_size = int(param.shape[0] ** batch_size_power)
+            self.batch_size = 2 ** int(np.log2(batch_size))
         self.averaged = averaged
         # Learning rate exponent set to 1 for non averaged algorithms, otherwise set to a default value
         if lr_exp is not None:
@@ -69,26 +67,36 @@ class BaseOptimizer(ABC):
         else:
             self.lr_exp = 1.0 if not averaged else self.DEFAULT_LR_EXP
         self.lr_const = lr_const
-        self.lr_add_iter = lr_add_iter
+        if lr_add_iter is not None:
+            self.lr_add_iter = lr_add_iter
+        else:
+            self.lr_add_iter = param.shape[0]
         self.log_weight = log_weight
 
         # Multiply the learning rate by an exponent of the mini-batch size
-        if multiply_lr > 0 and self.mini_batch > 1:
-            self.multiply_lr = True  # TODO : check if this is necessary
+        if multiply_lr == "default":
+            multiply_lr = 1 - self.lr_exp
+        if multiply_lr > 0 and self.batch_size > 1:
+            self.multiply_lr = True  # TODO : check if this is necessary, we take min(lr, expected_first_lr) in the step function
             self.expected_first_lr = self.lr_const * (1 + self.lr_add_iter) ** (-self.lr_exp)
-            self.lr_const *= self.mini_batch**multiply_lr
+            self.lr_const *= self.batch_size**multiply_lr
         else:
             self.multiply_lr = False
 
         self.name = (
-            ("S" if self.mini_batch_power != 0 else "")  # S for Streaming
+            ("S" if self.batch_size > 1 else "")  # S for Streaming
             # + ("W" if averaged and log_weight != 0.0 else "")  # W for Weighted
             + ("A" if averaged else "")  # A for Averaged
             + self.name
             + (f" α={self.lr_exp}")
             + (f" c_α={lr_const}" if lr_const != self.DEFAULT_LR_CONST else "")
-            + (f" p=d^{self.mini_batch_power}" if self.mini_batch_power != 0 else "")
-            + (f" c_α*p^{multiply_lr}" if multiply_lr > 0 and self.mini_batch > 1 else "")
+            # + (f" p=d^{self.mini_batch_power}" if self.mini_batch_power != 0 else "")
+            + (f" p={self.batch_size}" if self.batch_size > 1 else "")
+            + (
+                f" c_α*p^{float(multiply_lr):.2f}"
+                if (multiply_lr > 0 and self.batch_size > 1)
+                else ""
+            )
         )
 
         # Copy the initial parameter if averaged, otherwise use the same

@@ -18,18 +18,18 @@ class USNA(BaseOptimizer):
         self,
         param: np.ndarray,
         obj_function: BaseObjectiveFunction,
-        mini_batch: int = None,
-        mini_batch_power: float = 0.0,
+        batch_size: int = None,
+        batch_size_power: float = 0.0,
         lr_exp: float = None,
         lr_const: float = BaseOptimizer.DEFAULT_LR_CONST,
-        lr_add_iter: int = BaseOptimizer.DEFAULT_LR_ADD_ITER,
+        lr_add_iter: int = None,
         averaged: bool = False,
         log_weight: float = BaseOptimizer.DEFAULT_LOG_WEIGHT,
-        multiply_lr: float = BaseOptimizer.DEFAULT_MULTIPLY_LR,
+        multiply_lr: float | str = 0.0,
         # USNA specific parameters
         lr_hess_exp: float = 0.75,  # Set to 0.75 in the article
         lr_hess_const: float = 0.1,  # Not specified in the article, and 1.0 diverges
-        lr_hess_add_iter: int = 400,  # Not specified, Works better
+        lr_hess_add_iter: int = 1,  # Not specified, Works better
         averaged_matrix: bool = False,  # Wether to use an averaged estimate of the inverse hessian
         log_weight_matrix: float = 2.0,  # Exponent for the logarithmic weight of the averaged inverse hessian
         compute_hessian_param_avg: bool = False,  # If averaged, where to compute the hessian
@@ -38,7 +38,7 @@ class USNA(BaseOptimizer):
         self.name += (
             (" AM" if averaged_matrix else "")
             + (" AP" if compute_hessian_param_avg else "")
-            + (" P" if proj else "")
+            + (" I" if not proj else "")
             + (f" γ={lr_hess_exp}" if lr_hess_exp != 0.75 else "")
             + (f" c_γ={lr_hess_const}" if lr_hess_const != 0.1 else "")
         )
@@ -59,8 +59,8 @@ class USNA(BaseOptimizer):
         super().__init__(
             param=param,
             obj_function=obj_function,
-            mini_batch=mini_batch,
-            mini_batch_power=mini_batch_power,
+            batch_size=batch_size,
+            batch_size_power=batch_size_power,
             lr_exp=lr_exp,
             lr_const=lr_const,
             lr_add_iter=lr_add_iter,
@@ -88,7 +88,7 @@ class USNA(BaseOptimizer):
 
         # Update theta
         learning_rate = self.lr_const * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
-        if self.multiply_lr and self.mini_batch > 1:
+        if self.multiply_lr and self.batch_size > 1:
             learning_rate = min(learning_rate, self.expected_first_lr)
         self.param_not_averaged -= learning_rate * self.matrix @ grad
 

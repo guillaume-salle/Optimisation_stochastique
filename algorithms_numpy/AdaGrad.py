@@ -8,19 +8,8 @@ from objective_functions_numpy.streaming import BaseObjectiveFunction
 class AdaGrad(BaseOptimizer):
     """
     Adagrad optimizer. Uses a learning rate lr = lr_const * (n_iter + lr_add_iter)^(-lr_exp) for optimization.
-    Averaged parameter can be calculated with a logarithmic weight, i.e. the weight is
-    calculated as log(n_iter+1)^weight_exp.
 
-    Parameters:
-    param (np.ndarray): Initial parameters for the optimizer.
-    obj_function (BaseObjectiveFunction): Objective function to optimize.
-    mini_batch (int): Size of mini-batch.
-    mini_batch_power (float): size of mini-batch as a power of the dimension of the parameter to optimize.
-    lr_exp (float): Exponent for learning rate decay.
-    lr_const (float): Constant multiplier for learning rate.
-    lr_add_iter (int): Additional iterations for learning rate calculation.
-    averaged (bool): Whether to use an averaged parameter.
-    log_exp (float): Exponent for the logarithmic weight.
+    AdaGrad specific parameters:
     epsilon (float): Small constant to avoid singularity problems.
     true_adagrad (bool): Whether to use the true Adagrad update rule, or one with a decreasing learning rate.
     """
@@ -31,14 +20,14 @@ class AdaGrad(BaseOptimizer):
         self,
         param: np.ndarray,
         obj_function: BaseObjectiveFunction,
-        mini_batch: int = None,
-        mini_batch_power: float = 0.0,
+        batch_size: int = None,
+        batch_size_power: float = 0.0,
         lr_exp: float = None,
         lr_const: float = BaseOptimizer.DEFAULT_LR_CONST,
-        lr_add_iter: int = BaseOptimizer.DEFAULT_LR_ADD_ITER,
+        lr_add_iter: int = None,
         averaged: bool = None,
         log_weight: float = BaseOptimizer.DEFAULT_LOG_WEIGHT,
-        multiply_lr: float = BaseOptimizer.DEFAULT_MULTIPLY_LR,
+        multiply_lr: float = 0.0,
         # AdaGrad specific parameter
         epsilon: float = 1e-8,
         true_ada: bool = True,
@@ -51,8 +40,8 @@ class AdaGrad(BaseOptimizer):
         super().__init__(
             param=param,
             obj_function=obj_function,
-            mini_batch=mini_batch,
-            mini_batch_power=mini_batch_power,
+            batch_size=batch_size,
+            batch_size_power=batch_size_power,
             lr_exp=lr_exp,
             lr_const=lr_const,
             lr_add_iter=lr_add_iter,
@@ -87,7 +76,7 @@ class AdaGrad(BaseOptimizer):
                 * (self.n_iter + self.lr_add_iter) ** (-self.lr_exp)
                 * np.sqrt(self.n_iter)
             )
-        if self.multiply_lr and self.mini_batch > 1:
+        if self.multiply_lr and self.batch_size > 1:
             learning_rate = min(learning_rate, self.expected_first_lr)
         self.param_not_averaged -= learning_rate * grad / np.sqrt(self.sum_grad_sq)
 
