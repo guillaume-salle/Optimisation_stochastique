@@ -21,9 +21,6 @@ from datasets_numpy import (
 )
 
 
-# Configuration for the number of runs and size of data
-N = 10
-n = int(1e8)
 dim = 200
 
 # Configuration for true parameter

@@ -18,7 +18,7 @@ class BaseOptimizer(ABC):
             Perform one optimization step. Should be implemented by subclasses.
     """
 
-    DEFAULT_LR_EXP = 0.67  # Default value for the learning rate exponent for averaged algorithms
+    DEFAULT_LR_EXP = 0.75  # Default value for the learning rate exponent for averaged algorithms
     DEFAULT_LR_CONST = 1.0
     DEFAULT_LOG_WEIGHT = 2.0
     DEFAULT_BATCH_SIZE_POWER = 0.5
@@ -43,14 +43,14 @@ class BaseOptimizer(ABC):
         Args:
             param (np.ndarray): The initial parameters for the optimizer.
             obj_function (BaseObjectiveFunction): The objective function to optimize.
-            batch_size (int): The mini-batch size for optimization. If None, calculated from the power of the dimension.
-            batch_size_power (float): The power of the dimension for the mini-batch size.
+            batch_size (int): The batch size size for optimization. If None, calculated from the power of the dimension.
+            batch_size_power (float): The power of the dimension for the batch size.
             lr_exp (float): The exponent for the learning rate. If None, set to 1 for non averaged algorithms and to the default value for averaged algorithms.
             lr_const (float): The constant for the learning rate.
             lr_add_iter (int): The number of iterations to add to the learning rate. If None, set to the dimension of the parameter.
             averaged (bool): Whether to use an averaged parameter
             log_exp (float): Exponent for the logarithmic weight.
-            multiply_lr (float | str): Multiply the learning rate by mini_batch_size^multiply_lr, for mini-batch. 0 for no multiplication
+            multiply_lr (float | str): Multiply the learning rate by batch_size^multiply_lr, for mini-batch. 0 for no multiplication
         """
         self.param = param
         self.obj_function = obj_function
@@ -73,7 +73,7 @@ class BaseOptimizer(ABC):
             self.lr_add_iter = param.shape[0]
         self.log_weight = log_weight
 
-        # Multiply the learning rate by an exponent of the mini-batch size
+        # Multiply the learning rate by an exponent of the batch size
         if multiply_lr == "default":
             multiply_lr = 1 - self.lr_exp
         if multiply_lr > 0 and self.batch_size > 1:
@@ -90,7 +90,7 @@ class BaseOptimizer(ABC):
             + self.name
             + (f" α={self.lr_exp}")
             + (f" c_α={lr_const}" if lr_const != self.DEFAULT_LR_CONST else "")
-            # + (f" p=d^{self.mini_batch_power}" if self.mini_batch_power != 0 else "")
+            # + (f" p=d^{self.batch_size_power}" if self.batch_size_power != 0 else "")
             + (f" p={self.batch_size}" if self.batch_size > 1 else "")
             + (
                 f" c_α*p^{float(multiply_lr):.2f}"
